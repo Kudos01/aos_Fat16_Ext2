@@ -24,13 +24,15 @@ pub fn get_file_info(file_name: &str) {
 
     // TODO? get the bytes of the file before attempting to read at offset?
 
-    opened_file.seek(SeekFrom::Start(32)).unwrap();
+    //Start at 22 since this is BPB_FATSz16, if not 0, it is a FAT16 volume
+    opened_file.seek(SeekFrom::Start(22)).unwrap();
 
-    let buf: &mut [u8] = &mut [0; 4];
+    //Create a buffer of 2 bytes for reading to see if it is a Fat16 or 32
+    let buf: &mut [u8] = &mut [0; 2];
 
     let bytes_read = opened_file.read_exact(buf);
 
-    println!("{:?} {:?}", buf, bytes_read);
+    println!("{:?}", buf);
 
     // TODO Check if FS is ext2 or FAT16 or neither
     // TODO If neither, then print error and return
