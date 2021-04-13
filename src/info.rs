@@ -1,5 +1,6 @@
-use positioned_io::ReadAt;
+//use positioned_io::ReadAt;
 use std::fs::File;
+use std::io::prelude::*;
 use std::io::Seek;
 use std::io::SeekFrom;
 
@@ -23,12 +24,13 @@ pub fn get_file_info(file_name: &str) {
 
     // TODO? get the bytes of the file before attempting to read at offset?
 
-    let bytes_read1 = opened_file.seek(SeekFrom::Start(36)).unwrap();
+    opened_file.seek(SeekFrom::Start(32)).unwrap();
 
-    let mut buf = [0; 4];
-    let bytes_read = opened_file.read_at(2048, &mut buf);
-    println!("{:?}", bytes_read1);
-    println!("{:?}", bytes_read.unwrap());
+    let buf: &mut [u8] = &mut [0; 4];
+
+    let bytes_read = opened_file.read_exact(buf);
+
+    println!("{:?} {:?}", buf, bytes_read);
 
     // TODO Check if FS is ext2 or FAT16 or neither
     // TODO If neither, then print error and return
