@@ -5,30 +5,29 @@ fn main() {
     let matches = App::new("AOS The Shooter")
         .author("Felipe Perez <fpstoppa@gmail.com>")
         .arg(
-            Arg::with_name("file")
-                .short("f")
-                .long("file")
+            Arg::with_name("operation")
                 .takes_value(true)
-                .help("A cool file"),
+                .help("The desired operation"),
         )
         .arg(
-            Arg::with_name("num")
-                .short("n")
-                .long("number")
+            Arg::with_name("file")
                 .takes_value(true)
-                .help("Five less than your favorite number"),
+                .help("The volume to be scanned"),
         )
         .get_matches();
 
     let myfile = matches.value_of("file").unwrap_or("input.txt");
     println!("The file passed is: {}", myfile);
 
-    let num_str = matches.value_of("num");
-    match num_str {
-        None => println!("No idea what your favorite number is."),
-        Some(s) => match s.parse::<i32>() {
-            Ok(n) => println!("Your favorite number must be {}.", n + 5),
-            Err(_) => println!("That's not a number! {}", s),
+    let operation = matches.value_of("operation");
+    match operation {
+        None => println!("No operation passed!"),
+        Some(s) => match s {
+            "/info" => {
+                println!("Operation: {}", s);
+                //if selected option is info, run the function that gets
+            }
+            _ => println!("Invalid operation {}", s),
         },
     }
 }
