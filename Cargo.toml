@@ -1,0 +1,11 @@
+[package]
+name = "aos_theshooter_2021"
+version = "0.1.0"
+authors = ["felipe.perez <fpstoppa@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+clap = "2"
