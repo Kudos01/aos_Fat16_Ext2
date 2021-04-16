@@ -87,13 +87,13 @@ fn get_fat16_info(mut opened_file: File) {
 
     // ------------------------ SIZE ------------------------
 
-    // starts at 11 BPB_BytsPerSec
-    opened_file.seek(SeekFrom::Start(11)).unwrap();
-    let aux1: &mut [u8] = &mut [0; 2];
-    let _buf1 = opened_file.read_exact(aux1);
-    let size_sector = ((aux1[1] as u16) << 8) | aux1[0] as u16;
+    let mut file_struct: FileStruct = Default::default();
 
-    println!("Size: {}", size_sector);
+    // starts at 11 BPB_BytsPerSec
+    seek_read(&mut opened_file, 13, &mut file_struct.a1).unwrap();
+    seek_read(&mut opened_file, 14, &mut file_struct.a2).unwrap();
+
+    println!("{:?}", file_struct);
 
     // ------------------------ SECTORS PER CLUSTER ------------------------
 
@@ -111,11 +111,12 @@ fn get_fat16_info(mut opened_file: File) {
     let aux: &mut [u8] = &mut [0; 2];
     //let _buf = opened_file.read_exact(aux);
     let _buf = opened_file.read_exact(aux);
-
+    /*
     println!(
         "Reserved sectors: {:?}",
         ((aux1[0] as u16) << 8) | aux1[1] as u16
     );
+    */
 
     // ------------------------ VOLUME LABEL ------------------------
 
