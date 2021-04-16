@@ -1,13 +1,18 @@
-use std::io::{self, prelude::*, SeekFrom};
-
 use std::fs::File;
 use std::io::Seek;
+use std::io::{self, prelude::*, SeekFrom};
 use std::str;
 
 #[derive(Debug, Clone, Default)]
 struct FileStruct {
-    a1: [u8; 1],
-    a2: [u8; 2],
+    volume_name: [u8; 8],
+    sector_size: [u8; 2],
+    sectors_per_cluster: [u8; 1],
+    num_fats: [u8; 1],
+    root_entries: [u8; 2],
+    sectors_per_fat: [u8; 2],
+    reserved_sectors: [u8; 2],
+    volume_label: [u8; 11],
 }
 
 fn seek_read(mut reader: impl Read + Seek, offset: u64, buf: &mut [u8]) -> io::Result<()> {
@@ -25,17 +30,7 @@ pub fn get_file_info(file_name: &str) {
         Ok(opened_file) => opened_file,
     };
 
-    /*
-    let mut s = String::new();
-
-    match opened_file.read_to_string(&mut s) {
-        Err(why) => panic!("couldn't read {}: {}", file_name, why),
-        Ok(_) => print!("{} contains:\n{}", file_name, s),
-    }
-    */
-
     // TODO? get the bytes of the file before attempting to read at offset?
-    //let checker = Checker::default();
     //Create a buffer of 2 bytes for reading to see if it is a Fat16 or 32
     let fat_buf: &mut [u8] = &mut [0; 2];
     //Create a buffer of 2 bytes for reading to see if it is a Fat16 or 32
@@ -51,10 +46,6 @@ pub fn get_file_info(file_name: &str) {
 
     let fat_num = ((fat_buf[1] as u16) << 8) | fat_buf[0] as u16;
     let ext2_num = ((ext2_buf[1] as u16) << 8) | ext2_buf[0] as u16;
-
-    //println!("FAT: {}", fat_num);
-    //println!("EXT2: {}", ext2_num);
-    //let checker = Checker::default();
 
     // Check if FS is ext2 or FAT16 or neither
     if ext2_num == 61267 {
@@ -75,60 +66,79 @@ fn get_fat16_info(mut opened_file: File) {
 
     // ------------------------ VOLUME NAME ------------------------
 
-    // Volume name starts at 3
-    opened_file.seek(SeekFrom::Start(3)).unwrap();
-    let aux: &mut [u8] = &mut [0; 8];
-    let _buf = opened_file.read_exact(aux);
+    //create a file struct to store the read information
+    let mut file_struct: FileStruct = Default::default();
 
-    match str::from_utf8(aux) {
+    // Volume name starts at 3
+    seek_read(&mut opened_file, 3, &mut file_struct.volume_name).unwrap();
+
+    match str::from_utf8(&file_struct.volume_name) {
         Ok(v) => println!("Volume Name: {}", v),
         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
     };
 
     // ------------------------ SIZE ------------------------
-
-    let mut file_struct: FileStruct = Default::default();
-
-    // starts at 11 BPB_BytsPerSec
-    seek_read(&mut opened_file, 13, &mut file_struct.a1).unwrap();
-    seek_read(&mut opened_file, 14, &mut file_struct.a2).unwrap();
-
-    println!("{:?}", file_struct);
+    // Volume name starts at 11
+    seek_read(&mut opened_file, 11, &mut file_struct.sector_size).unwrap();
+    println!("Size: {}", to_u16(&mut file_struct.sector_size, false));
 
     // ------------------------ SECTORS PER CLUSTER ------------------------
 
     // starts at 13
-    opened_file.seek(SeekFrom::Start(13)).unwrap();
-    let aux: &mut [u8] = &mut [0; 1];
-    let _buf = opened_file.read_exact(aux);
-
-    println!("Sectors per cluster: {}", aux[0]);
+    seek_read(&mut opened_file, 13, &mut file_struct.sectors_per_cluster).unwrap();
+    println!(
+        "Sectors per cluster: {}",
+        file_struct.sectors_per_cluster[0]
+    );
 
     // ------------------------ RESERVED SECTORS ------------------------
 
     // starts at 14
-    opened_file.seek(SeekFrom::Start(14)).unwrap();
-    let aux: &mut [u8] = &mut [0; 2];
-    //let _buf = opened_file.read_exact(aux);
-    let _buf = opened_file.read_exact(aux);
-    /*
+    seek_read(&mut opened_file, 14, &mut file_struct.reserved_sectors).unwrap();
     println!(
-        "Reserved sectors: {:?}",
-        ((aux1[0] as u16) << 8) | aux1[1] as u16
+        "Reserved sectors: {}",
+        to_u16(&mut file_struct.reserved_sectors, false)
     );
-    */
 
     // ------------------------ VOLUME LABEL ------------------------
 
     // Volume Label starts at 43
-    opened_file.seek(SeekFrom::Start(43)).unwrap();
-    let aux: &mut [u8] = &mut [0; 11];
-    let _buf = opened_file.read_exact(aux);
-
-    match str::from_utf8(aux) {
+    seek_read(&mut opened_file, 43, &mut file_struct.volume_label).unwrap();
+    match str::from_utf8(&mut file_struct.volume_label) {
         Ok(v) => println!("Volume Label: {}", v),
         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
     };
+
+    // ------------------------ NUM FATS ------------------------
+
+    // starts at 16
+    seek_read(&mut opened_file, 16, &mut file_struct.num_fats).unwrap();
+    println!("Number of FATs: {}", file_struct.num_fats[0]);
+
+    // ------------------------ ROOT ENTRIES ------------------------
+
+    // starts at 17
+    seek_read(&mut opened_file, 17, &mut file_struct.root_entries).unwrap();
+    println!(
+        "Root entries: {}",
+        to_u16(&mut file_struct.root_entries, false)
+    );
+
+    // ------------------------ SECOTRS PER FAT ------------------------
+
+    // starts at 22
+    seek_read(&mut opened_file, 22, &mut file_struct.root_entries).unwrap();
+    println!(
+        "Sectors per FAT: {}",
+        to_u16(&mut file_struct.root_entries, false)
+    );
+}
+
+fn to_u16(to_convert: &mut [u8; 2], little_endian: bool) -> u16 {
+    match little_endian {
+        true => return ((to_convert[0] as u16) << 8) | to_convert[1] as u16,
+        false => return ((to_convert[1] as u16) << 8) | to_convert[0] as u16,
+    }
 }
 
 /*
