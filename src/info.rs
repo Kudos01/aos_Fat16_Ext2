@@ -1,23 +1,20 @@
-//use positioned_io::ReadAt;
+use std::io::{self, prelude::*, SeekFrom};
+
 use std::fs::File;
-use std::io::prelude::*;
 use std::io::Seek;
-use std::io::SeekFrom;
-/*
-struct Checker {
-    buf_fat: u16,
-    buf_ext2: u16,
+use std::str;
+
+#[derive(Debug, Clone, Default)]
+struct FileStruct {
+    a1: [u8; 1],
+    a2: [u8; 2],
 }
 
-impl Default for Checker {
-    fn default() -> Checker {
-        Checker {
-            buf_fat: 0,
-            buf_ext2: 0,
-        }
-    }
+fn seek_read(mut reader: impl Read + Seek, offset: u64, buf: &mut [u8]) -> io::Result<()> {
+    reader.seek(SeekFrom::Start(offset))?;
+    reader.read_exact(buf)?;
+    Ok(())
 }
-*/
 
 // Use the `pub` modifier to override default visibility.
 pub fn get_file_info(file_name: &str) {
@@ -62,16 +59,79 @@ pub fn get_file_info(file_name: &str) {
     // Check if FS is ext2 or FAT16 or neither
     if ext2_num == 61267 {
         println!("EXT2 FS!");
-        get_ext2_info();
+        //get_ext2_info(opened_file);
     } else if fat_num == 16 {
         println!("FAT16 FS!");
-        get_fat16_info();
+        get_fat16_info(opened_file);
     } else {
         //If neither, then print error and return
         println!("File system is neither EXT2 nor FAT16.");
     }
 }
 
-fn get_fat16_info() {}
+fn get_fat16_info(mut opened_file: File) {
+    println!("------ Filesystem Information ------");
+    println!("Filesystem: FAT16");
 
-fn get_ext2_info() {}
+    // ------------------------ VOLUME NAME ------------------------
+
+    // Volume name starts at 3
+    opened_file.seek(SeekFrom::Start(3)).unwrap();
+    let aux: &mut [u8] = &mut [0; 8];
+    let _buf = opened_file.read_exact(aux);
+
+    match str::from_utf8(aux) {
+        Ok(v) => println!("Volume Name: {}", v),
+        Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+    };
+
+    // ------------------------ SIZE ------------------------
+
+    // starts at 11 BPB_BytsPerSec
+    opened_file.seek(SeekFrom::Start(11)).unwrap();
+    let aux1: &mut [u8] = &mut [0; 2];
+    let _buf1 = opened_file.read_exact(aux1);
+    let size_sector = ((aux1[1] as u16) << 8) | aux1[0] as u16;
+
+    println!("Size: {}", size_sector);
+
+    // ------------------------ SECTORS PER CLUSTER ------------------------
+
+    // starts at 13
+    opened_file.seek(SeekFrom::Start(13)).unwrap();
+    let aux: &mut [u8] = &mut [0; 1];
+    let _buf = opened_file.read_exact(aux);
+
+    println!("Sectors per cluster: {}", aux[0]);
+
+    // ------------------------ RESERVED SECTORS ------------------------
+
+    // starts at 14
+    opened_file.seek(SeekFrom::Start(14)).unwrap();
+    let aux: &mut [u8] = &mut [0; 2];
+    //let _buf = opened_file.read_exact(aux);
+    let _buf = opened_file.read_exact(aux);
+
+    println!(
+        "Reserved sectors: {:?}",
+        ((aux1[0] as u16) << 8) | aux1[1] as u16
+    );
+
+    // ------------------------ VOLUME LABEL ------------------------
+
+    // Volume Label starts at 43
+    opened_file.seek(SeekFrom::Start(43)).unwrap();
+    let aux: &mut [u8] = &mut [0; 11];
+    let _buf = opened_file.read_exact(aux);
+
+    match str::from_utf8(aux) {
+        Ok(v) => println!("Volume Label: {}", v),
+        Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+    };
+}
+
+/*
+fn get_ext2_info(mut opened_file: File) {
+    println!("------ Filesystem Information ------");
+}
+*/

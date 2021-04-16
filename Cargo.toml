@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 clap = "2"
 positioned-io = "0.2"
+byteorder = "1"
