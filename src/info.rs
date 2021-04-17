@@ -3,8 +3,15 @@ use std::io::Seek;
 use std::io::{self, prelude::*, SeekFrom};
 use std::str;
 
-#[derive(Debug, Clone, Default)]
-struct FileStruct {
+use std::convert::TryInto;
+
+use chrono::*;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use byteorder::{BigEndian, ByteOrder, LittleEndian};
+
+#[derive(Default)]
+struct Fat16Struct {
     volume_name: [u8; 8],
     sector_size: [u8; 2],
     sectors_per_cluster: [u8; 1],
@@ -13,6 +20,48 @@ struct FileStruct {
     sectors_per_fat: [u8; 2],
     reserved_sectors: [u8; 2],
     volume_label: [u8; 11],
+}
+
+struct Ext2Struct {
+    volume_name: [u8; 16],
+    last_mounted: [u8; 4],
+    last_check: [u8; 4],
+    last_write: [u8; 4],
+    num_inodes: [u8; 4],
+    inodes_per_group: [u8; 4],
+    first_inode: [u8; 4],
+    free_inodes: [u8; 2],
+    inode_size: [u8; 2],
+    free_blocks_count: [u8; 4],
+    block_size: [u8; 4],
+    reserved_blocks_count: [u8; 4],
+    num_blocks: [u8; 4],
+    first_data_block: [u8; 4],
+    blocks_per_group: [u8; 4],
+    frags_per_group: [u8; 4],
+}
+
+impl Default for Ext2Struct {
+    fn default() -> Ext2Struct {
+        Ext2Struct {
+            volume_name: [0; 16],
+            last_mounted: [0; 4],
+            last_check: [0; 4],
+            last_write: [0; 4],
+            num_inodes: [0; 4],
+            inodes_per_group: [0; 4],
+            first_inode: [0; 4],
+            free_inodes: [0; 2],
+            inode_size: [0; 2],
+            free_blocks_count: [0; 4],
+            block_size: [0; 4],
+            reserved_blocks_count: [0; 4],
+            num_blocks: [0; 4],
+            first_data_block: [0; 4],
+            blocks_per_group: [0; 4],
+            frags_per_group: [0; 4],
+        }
+    }
 }
 
 fn seek_read(mut reader: impl Read + Seek, offset: u64, buf: &mut [u8]) -> io::Result<()> {
@@ -49,10 +98,10 @@ pub fn get_file_info(file_name: &str) {
 
     // Check if FS is ext2 or FAT16 or neither
     if ext2_num == 61267 {
-        println!("EXT2 FS!");
-        //get_ext2_info(opened_file);
+        //println!("EXT2 FS!");
+        get_ext2_info(opened_file);
     } else if fat_num == 16 {
-        println!("FAT16 FS!");
+        //println!("FAT16 FS!");
         get_fat16_info(opened_file);
     } else {
         //If neither, then print error and return
@@ -67,44 +116,44 @@ fn get_fat16_info(mut opened_file: File) {
     // ------------------------ VOLUME NAME ------------------------
 
     //create a file struct to store the read information
-    let mut file_struct: FileStruct = Default::default();
+    let mut fat16_struct: Fat16Struct = Default::default();
 
     // Volume name starts at 3
-    seek_read(&mut opened_file, 3, &mut file_struct.volume_name).unwrap();
+    seek_read(&mut opened_file, 3, &mut fat16_struct.volume_name).unwrap();
 
-    match str::from_utf8(&file_struct.volume_name) {
+    match str::from_utf8(&fat16_struct.volume_name) {
         Ok(v) => println!("Volume Name: {}", v),
         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
     };
 
     // ------------------------ SIZE ------------------------
     // Volume name starts at 11
-    seek_read(&mut opened_file, 11, &mut file_struct.sector_size).unwrap();
-    println!("Size: {}", to_u16(&mut file_struct.sector_size, false));
+    seek_read(&mut opened_file, 11, &mut fat16_struct.sector_size).unwrap();
+    println!("Size: {}", to_u16(&mut fat16_struct.sector_size, false));
 
     // ------------------------ SECTORS PER CLUSTER ------------------------
 
     // starts at 13
-    seek_read(&mut opened_file, 13, &mut file_struct.sectors_per_cluster).unwrap();
+    seek_read(&mut opened_file, 13, &mut fat16_struct.sectors_per_cluster).unwrap();
     println!(
         "Sectors per cluster: {}",
-        file_struct.sectors_per_cluster[0]
+        fat16_struct.sectors_per_cluster[0]
     );
 
     // ------------------------ RESERVED SECTORS ------------------------
 
     // starts at 14
-    seek_read(&mut opened_file, 14, &mut file_struct.reserved_sectors).unwrap();
+    seek_read(&mut opened_file, 14, &mut fat16_struct.reserved_sectors).unwrap();
     println!(
         "Reserved sectors: {}",
-        to_u16(&mut file_struct.reserved_sectors, false)
+        to_u16(&mut fat16_struct.reserved_sectors, false)
     );
 
     // ------------------------ VOLUME LABEL ------------------------
 
     // Volume Label starts at 43
-    seek_read(&mut opened_file, 43, &mut file_struct.volume_label).unwrap();
-    match str::from_utf8(&mut file_struct.volume_label) {
+    seek_read(&mut opened_file, 43, &mut fat16_struct.volume_label).unwrap();
+    match str::from_utf8(&mut fat16_struct.volume_label) {
         Ok(v) => println!("Volume Label: {}", v),
         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
     };
@@ -112,25 +161,61 @@ fn get_fat16_info(mut opened_file: File) {
     // ------------------------ NUM FATS ------------------------
 
     // starts at 16
-    seek_read(&mut opened_file, 16, &mut file_struct.num_fats).unwrap();
-    println!("Number of FATs: {}", file_struct.num_fats[0]);
+    seek_read(&mut opened_file, 16, &mut fat16_struct.num_fats).unwrap();
+    println!("Number of FATs: {}", fat16_struct.num_fats[0]);
 
     // ------------------------ ROOT ENTRIES ------------------------
 
     // starts at 17
-    seek_read(&mut opened_file, 17, &mut file_struct.root_entries).unwrap();
+    seek_read(&mut opened_file, 17, &mut fat16_struct.root_entries).unwrap();
     println!(
         "Root entries: {}",
-        to_u16(&mut file_struct.root_entries, false)
+        to_u16(&mut fat16_struct.root_entries, false)
     );
 
     // ------------------------ SECOTRS PER FAT ------------------------
 
     // starts at 22
-    seek_read(&mut opened_file, 22, &mut file_struct.root_entries).unwrap();
+    seek_read(&mut opened_file, 22, &mut fat16_struct.sectors_per_fat).unwrap();
     println!(
         "Sectors per FAT: {}",
-        to_u16(&mut file_struct.root_entries, false)
+        to_u16(&mut fat16_struct.sectors_per_fat, false)
+    );
+}
+
+fn get_ext2_info(mut opened_file: File) {
+    println!("------ Filesystem Information ------");
+    println!("Filesystem: EXT2");
+    let mut ext2_struct: Ext2Struct = Default::default();
+    println!("INFO VOLUME");
+    // ------------------------ VOLUME NAME ------------------------
+    // starts at 120 + 1024
+    seek_read(&mut opened_file, 1144, &mut ext2_struct.volume_name).unwrap();
+    match str::from_utf8(&mut ext2_struct.volume_name) {
+        Ok(v) => println!("Volume Name: {}", v),
+        Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+    };
+    // ------------------------ LAST CHECKED ------------------------
+    // starts at 64
+    seek_read(&mut opened_file, 1024 + 64, &mut ext2_struct.last_check).unwrap();
+    println!(
+        "Last Checked: {}",
+        convert_to_utc_time(ext2_struct.last_check).format("%A %e %B %Y, %T"),
+    );
+
+    // ------------------------ LAST WRITE/EDIT ------------------------
+    // starts at 48
+    seek_read(&mut opened_file, 1024 + 64, &mut ext2_struct.last_write).unwrap();
+    println!(
+        "Last Write: {}",
+        convert_to_utc_time(ext2_struct.last_write).format("%A %e %B %Y, %T"),
+    );
+    // ------------------------ LAST MOUNTED ------------------------
+    // starts at 44
+    seek_read(&mut opened_file, 1024 + 44, &mut ext2_struct.last_mounted).unwrap();
+    println!(
+        "Last Mounted: {}",
+        convert_to_utc_time(ext2_struct.last_mounted).format("%A %e %B %Y, %T"),
     );
 }
 
@@ -141,8 +226,13 @@ fn to_u16(to_convert: &mut [u8; 2], little_endian: bool) -> u16 {
     }
 }
 
-/*
-fn get_ext2_info(mut opened_file: File) {
-    println!("------ Filesystem Information ------");
+fn convert_to_utc_time(to_convert: [u8; 4]) -> chrono::DateTime<chrono::Utc> {
+    //convert unix time to current time
+    let timestamp = LittleEndian::read_u32(&to_convert);
+    let naive = NaiveDateTime::from_timestamp(timestamp.try_into().unwrap(), 0);
+
+    // Create a normal DateTime from the NaiveDateTime
+    let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
+    // Format the datetime how you want
+    return datetime;
 }
-*/
