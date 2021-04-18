@@ -233,7 +233,7 @@ fn get_ext2_info(mut opened_file: File) {
     );
 
     println!("BLOCK INFO");
-    // ------------------------ VOLUME NAME ------------------------
+    // ------------------------ FREE BLOCKS ------------------------
     // starts at 12 + 1024
     seek_read(
         &mut opened_file,
@@ -246,14 +246,75 @@ fn get_ext2_info(mut opened_file: File) {
         LittleEndian::read_u32(&ext2_struct.free_blocks_count)
     );
 
-    // starts at 24 + 1024
-    let block_size_tmp: &mut [u8] = &mut [0; 4];
+    // ------------------------ RESERVED BLOCKS ------------------------
+    // starts at 8 + 1024
 
-    seek_read(&mut opened_file, 24 + 1024, block_size_tmp).unwrap();
+    seek_read(
+        &mut opened_file,
+        8 + 1024,
+        &mut ext2_struct.reserved_blocks_count,
+    )
+    .unwrap();
 
-    ext2_struct.block_size = 1024 << LittleEndian::read_u32(block_size_tmp);
+    println!(
+        "Reserved blocks: {}",
+        LittleEndian::read_u32(&ext2_struct.reserved_blocks_count)
+    );
 
-    println!("Block size: {}", ext2_struct.block_size);
+    // ------------------------ TOTAL BLOCKS ------------------------
+    // starts at 4 + 1024
+
+    seek_read(&mut opened_file, 4 + 1024, &mut ext2_struct.num_blocks).unwrap();
+
+    println!(
+        "Total blocks: {}",
+        LittleEndian::read_u32(&ext2_struct.num_blocks)
+    );
+
+    // ------------------------ TOTAL BLOCKS ------------------------
+    // starts at 20 + 1024
+
+    seek_read(
+        &mut opened_file,
+        20 + 1024,
+        &mut ext2_struct.first_data_block,
+    )
+    .unwrap();
+
+    println!(
+        "First data block: {}",
+        LittleEndian::read_u32(&ext2_struct.first_data_block)
+    );
+
+    // ------------------------ GROUP BLOCKS ------------------------
+    // starts at 32 + 1024
+
+    seek_read(
+        &mut opened_file,
+        32 + 1024,
+        &mut ext2_struct.blocks_per_group,
+    )
+    .unwrap();
+
+    println!(
+        "Blocks per group: {}",
+        LittleEndian::read_u32(&ext2_struct.blocks_per_group)
+    );
+
+    // ------------------------ FRAGS GROUP ------------------------
+    // starts at 36 + 1024
+
+    seek_read(
+        &mut opened_file,
+        36 + 1024,
+        &mut ext2_struct.blocks_per_group,
+    )
+    .unwrap();
+
+    println!(
+        "Group frags: {}\n",
+        LittleEndian::read_u32(&ext2_struct.blocks_per_group)
+    );
 
     println!("INFO VOLUME");
     // ------------------------ VOLUME NAME ------------------------
