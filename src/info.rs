@@ -5,7 +5,7 @@ use std::str;
 
 use std::convert::TryInto;
 
-use byteorder::{BigEndian, ByteOrder, LittleEndian};
+use byteorder::{ByteOrder, LittleEndian};
 use chrono::*;
 
 #[derive(Default)]
@@ -31,7 +31,7 @@ struct Ext2Struct {
     free_inodes: [u8; 2],
     inode_size: [u8; 2],
     free_blocks_count: [u8; 4],
-    block_size: u64,
+    block_size: u32,
     reserved_blocks_count: [u8; 4],
     num_blocks: [u8; 4],
     first_data_block: [u8; 4],
@@ -108,7 +108,7 @@ pub fn get_file_info(file_name: &str) {
 }
 
 fn get_fat16_info(mut opened_file: File) {
-    println!("------ Filesystem Information ------");
+    println!("\n------ Filesystem Information ------\n");
     println!("Filesystem: FAT16");
 
     // ------------------------ VOLUME NAME ------------------------
@@ -182,11 +182,12 @@ fn get_fat16_info(mut opened_file: File) {
 }
 
 fn get_ext2_info(mut opened_file: File) {
-    println!("------ Filesystem Information ------");
+    println!("\n------ Filesystem Information ------\n");
     println!("Filesystem: EXT2\n");
     let mut ext2_struct: Ext2Struct = Default::default();
 
     println!("INFO INODE");
+
     // ------------------------ INODE SIZE ------------------------
     // starts at 88 + 1024
     seek_read(&mut opened_file, 1024 + 88, &mut ext2_struct.inode_size).unwrap();
@@ -203,6 +204,14 @@ fn get_ext2_info(mut opened_file: File) {
         LittleEndian::read_u32(&ext2_struct.num_inodes)
     );
 
+    // ------------------------ FIRST INODE ------------------------
+    // starts at 84 + 1024
+    seek_read(&mut opened_file, 84 + 1024, &mut ext2_struct.first_inode).unwrap();
+    println!(
+        "First inode: {}",
+        LittleEndian::read_u32(&ext2_struct.first_inode)
+    );
+
     // ------------------------ INODES PER GROUP ------------------------
     // starts at 40 + 1024
     seek_read(
@@ -216,14 +225,6 @@ fn get_ext2_info(mut opened_file: File) {
         LittleEndian::read_u32(&ext2_struct.inodes_per_group)
     );
 
-    // ------------------------ FIRST INODE ------------------------
-    // starts at 84 + 1024
-    seek_read(&mut opened_file, 84 + 1024, &mut ext2_struct.first_inode).unwrap();
-    println!(
-        "First inode: {}",
-        LittleEndian::read_u32(&ext2_struct.first_inode)
-    );
-
     // ------------------------ FREE INODES ------------------------
     // starts at 14 + 2048
     seek_read(&mut opened_file, 14 + 2048, &mut ext2_struct.free_inodes).unwrap();
@@ -233,18 +234,17 @@ fn get_ext2_info(mut opened_file: File) {
     );
 
     println!("BLOCK INFO");
-    // ------------------------ FREE BLOCKS ------------------------
-    // starts at 12 + 1024
-    seek_read(
-        &mut opened_file,
-        12 + 1024,
-        &mut ext2_struct.free_blocks_count,
-    )
-    .unwrap();
-    println!(
-        "Free blocks: {}",
-        LittleEndian::read_u32(&ext2_struct.free_blocks_count)
-    );
+
+    // ------------------------ BLOCK SIZE ------------------------
+    // starts at 24 + 1024
+
+    let block_size_tmp: &mut [u8] = &mut [0; 4];
+
+    seek_read(&mut opened_file, 1024 + 24, block_size_tmp).unwrap();
+
+    ext2_struct.block_size = 1024 << LittleEndian::read_u32(&block_size_tmp);
+
+    println!("Block size: {}", ext2_struct.block_size);
 
     // ------------------------ RESERVED BLOCKS ------------------------
     // starts at 8 + 1024
@@ -261,6 +261,19 @@ fn get_ext2_info(mut opened_file: File) {
         LittleEndian::read_u32(&ext2_struct.reserved_blocks_count)
     );
 
+    // ------------------------ FREE BLOCKS ------------------------
+    // starts at 12 + 1024
+    seek_read(
+        &mut opened_file,
+        12 + 1024,
+        &mut ext2_struct.free_blocks_count,
+    )
+    .unwrap();
+    println!(
+        "Free blocks: {}",
+        LittleEndian::read_u32(&ext2_struct.free_blocks_count)
+    );
+
     // ------------------------ TOTAL BLOCKS ------------------------
     // starts at 4 + 1024
 
@@ -271,7 +284,7 @@ fn get_ext2_info(mut opened_file: File) {
         LittleEndian::read_u32(&ext2_struct.num_blocks)
     );
 
-    // ------------------------ TOTAL BLOCKS ------------------------
+    // ------------------------ FIRST DATA BLOCK ------------------------
     // starts at 20 + 1024
 
     seek_read(
@@ -307,13 +320,13 @@ fn get_ext2_info(mut opened_file: File) {
     seek_read(
         &mut opened_file,
         36 + 1024,
-        &mut ext2_struct.blocks_per_group,
+        &mut ext2_struct.frags_per_group,
     )
     .unwrap();
 
     println!(
         "Group frags: {}\n",
-        LittleEndian::read_u32(&ext2_struct.blocks_per_group)
+        LittleEndian::read_u32(&ext2_struct.frags_per_group)
     );
 
     println!("INFO VOLUME");
@@ -332,19 +345,20 @@ fn get_ext2_info(mut opened_file: File) {
         convert_to_utc_time(ext2_struct.last_check).format("%A %e %B %Y, %T"),
     );
 
-    // ------------------------ LAST WRITE/EDIT ------------------------
-    // starts at 48+ 1024
-    seek_read(&mut opened_file, 1024 + 64, &mut ext2_struct.last_write).unwrap();
-    println!(
-        "Last Write: {}",
-        convert_to_utc_time(ext2_struct.last_write).format("%A %e %B %Y, %T"),
-    );
     // ------------------------ LAST MOUNTED ------------------------
     // starts at 44+ 1024
     seek_read(&mut opened_file, 1024 + 44, &mut ext2_struct.last_mounted).unwrap();
     println!(
-        "Last Mounted: {}\n",
+        "Last Mounted: {}",
         convert_to_utc_time(ext2_struct.last_mounted).format("%A %e %B %Y, %T"),
+    );
+
+    // ------------------------ LAST WRITE/EDIT ------------------------
+    // starts at 48+ 1024
+    seek_read(&mut opened_file, 1024 + 64, &mut ext2_struct.last_write).unwrap();
+    println!(
+        "Last Write: {}\n",
+        convert_to_utc_time(ext2_struct.last_write).format("%A %e %B %Y, %T"),
     );
 }
 
