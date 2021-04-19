@@ -1,6 +1,6 @@
+use crate::file::*;
+
 use std::fs::File;
-use std::io::Seek;
-use std::io::{self, prelude::*, SeekFrom};
 use std::str;
 
 use std::convert::TryInto;
@@ -62,48 +62,18 @@ impl Default for Ext2Struct {
     }
 }
 
-fn seek_read(mut reader: impl Read + Seek, offset: u64, buf: &mut [u8]) -> io::Result<()> {
-    reader.seek(SeekFrom::Start(offset))?;
-    reader.read_exact(buf)?;
-    Ok(())
-}
-
 // Use the `pub` modifier to override default visibility.
 pub fn get_file_info(file_name: &str) {
-    //println!("file inside the function {}", file_name);
-
-    let mut opened_file = match File::open(&file_name) {
+    let opened_file = match File::open(&file_name) {
         Err(why) => panic!("couldn't open {}: {}", file_name, why),
         Ok(opened_file) => opened_file,
     };
 
-    // TODO? get the bytes of the file before attempting to read at offset?
-    //Create a buffer of 2 bytes for reading to see if it is a Fat16 or 32
-    let fat_buf: &mut [u8] = &mut [0; 2];
-    //Create a buffer of 2 bytes for reading to see if it is a Fat16 or 32
-    let ext2_buf: &mut [u8] = &mut [0; 2];
-
-    //Start at 22 since this is BPB_FATSz16, if not 0, it is a FAT16 volume
-    opened_file.seek(SeekFrom::Start(22)).unwrap();
-    let _bytes_read = opened_file.read_exact(fat_buf);
-
-    //For knowing if it is ext2, we check 2 bytes starting at offset 56 + 1024 (cus superblock)
-    opened_file.seek(SeekFrom::Start(56 + 1024)).unwrap();
-    let _bytes_read = opened_file.read_exact(ext2_buf);
-
-    let fat_num = ((fat_buf[1] as u16) << 8) | fat_buf[0] as u16;
-    let ext2_num = ((ext2_buf[1] as u16) << 8) | ext2_buf[0] as u16;
-
-    // Check if FS is ext2 or FAT16 or neither
-    if ext2_num == 61267 {
-        //println!("EXT2 FS!");
-        get_ext2_info(opened_file);
-    } else if fat_num == 16 {
-        //println!("FAT16 FS!");
-        get_fat16_info(opened_file);
-    } else {
-        //If neither, then print error and return
-        println!("File system is neither EXT2 nor FAT16.");
+    match check_file(&opened_file) {
+        EXT2_FLAG => get_ext2_info(opened_file),
+        FAT16_FLAG => get_fat16_info(opened_file),
+        FILE_ERROR_FLAG => panic!("File system is neither EXT2 nor FAT16"),
+        _ => panic!("We should not be here"),
     }
 }
 

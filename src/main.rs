@@ -1,5 +1,6 @@
 extern crate clap;
 use clap::{App, Arg};
+mod file;
 mod info;
 
 fn main() {
@@ -17,19 +18,22 @@ fn main() {
         )
         .get_matches();
 
-    // TODO Check if file exists and throw an error if it doesn't
-    // Also don't continue the program
     let myfile = matches.value_of("file").unwrap_or("input.txt");
-    println!("The file passed is: {}", myfile);
+
+    //Check if file exists and throw an error if it doesn't
+    // Also don't continue the program
 
     let operation = matches.value_of("operation");
     match operation {
         None => println!("No operation passed!"),
         Some(s) => match s {
             "/info" => {
-                println!("Operation: {}", s);
                 //if selected option is info, run the function that gets
                 info::get_file_info(myfile);
+            }
+            "/find" => {
+                //if selected option is info, run the function that gets
+                //find::find_file(myfile);
             }
             _ => println!("Invalid operation {}", s),
         },
