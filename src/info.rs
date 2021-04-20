@@ -8,60 +8,6 @@ use std::convert::TryInto;
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::*;
 
-#[derive(Default)]
-struct Fat16Struct {
-    volume_name: [u8; 8],
-    sector_size: [u8; 2],
-    sectors_per_cluster: [u8; 1],
-    num_fats: [u8; 1],
-    root_entries: [u8; 2],
-    sectors_per_fat: [u8; 2],
-    reserved_sectors: [u8; 2],
-    volume_label: [u8; 11],
-}
-
-struct Ext2Struct {
-    volume_name: [u8; 16],
-    last_mounted: [u8; 4],
-    last_check: [u8; 4],
-    last_write: [u8; 4],
-    num_inodes: [u8; 4],
-    inodes_per_group: [u8; 4],
-    first_inode: [u8; 4],
-    free_inodes: [u8; 2],
-    inode_size: [u8; 2],
-    free_blocks_count: [u8; 4],
-    block_size: u32,
-    reserved_blocks_count: [u8; 4],
-    num_blocks: [u8; 4],
-    first_data_block: [u8; 4],
-    blocks_per_group: [u8; 4],
-    frags_per_group: [u8; 4],
-}
-
-impl Default for Ext2Struct {
-    fn default() -> Ext2Struct {
-        Ext2Struct {
-            volume_name: [0; 16],
-            last_mounted: [0; 4],
-            last_check: [0; 4],
-            last_write: [0; 4],
-            num_inodes: [0; 4],
-            inodes_per_group: [0; 4],
-            first_inode: [0; 4],
-            free_inodes: [0; 2],
-            inode_size: [0; 2],
-            free_blocks_count: [0; 4],
-            block_size: 0,
-            reserved_blocks_count: [0; 4],
-            num_blocks: [0; 4],
-            first_data_block: [0; 4],
-            blocks_per_group: [0; 4],
-            frags_per_group: [0; 4],
-        }
-    }
-}
-
 // Use the `pub` modifier to override default visibility.
 pub fn get_file_info(file_name: &str) {
     let opened_file = match File::open(&file_name) {

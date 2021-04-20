@@ -7,6 +7,60 @@ pub const EXT2_FLAG: i8 = 1;
 pub const FAT16_FLAG: i8 = 2;
 pub const FILE_ERROR_FLAG: i8 = -1;
 
+#[derive(Default)]
+pub struct Fat16Struct {
+    pub volume_name: [u8; 8],
+    pub sector_size: [u8; 2],
+    pub sectors_per_cluster: [u8; 1],
+    pub num_fats: [u8; 1],
+    pub root_entries: [u8; 2],
+    pub sectors_per_fat: [u8; 2],
+    pub reserved_sectors: [u8; 2],
+    pub volume_label: [u8; 11],
+}
+
+pub struct Ext2Struct {
+    pub volume_name: [u8; 16],
+    pub last_mounted: [u8; 4],
+    pub last_check: [u8; 4],
+    pub last_write: [u8; 4],
+    pub num_inodes: [u8; 4],
+    pub inodes_per_group: [u8; 4],
+    pub first_inode: [u8; 4],
+    pub free_inodes: [u8; 2],
+    pub inode_size: [u8; 2],
+    pub free_blocks_count: [u8; 4],
+    pub block_size: u32,
+    pub reserved_blocks_count: [u8; 4],
+    pub num_blocks: [u8; 4],
+    pub first_data_block: [u8; 4],
+    pub blocks_per_group: [u8; 4],
+    pub frags_per_group: [u8; 4],
+}
+
+impl Default for Ext2Struct {
+    fn default() -> Ext2Struct {
+        Ext2Struct {
+            volume_name: [0; 16],
+            last_mounted: [0; 4],
+            last_check: [0; 4],
+            last_write: [0; 4],
+            num_inodes: [0; 4],
+            inodes_per_group: [0; 4],
+            first_inode: [0; 4],
+            free_inodes: [0; 2],
+            inode_size: [0; 2],
+            free_blocks_count: [0; 4],
+            block_size: 0,
+            reserved_blocks_count: [0; 4],
+            num_blocks: [0; 4],
+            first_data_block: [0; 4],
+            blocks_per_group: [0; 4],
+            frags_per_group: [0; 4],
+        }
+    }
+}
+
 pub fn seek_read(mut reader: impl Read + Seek, offset: u64, buf: &mut [u8]) -> io::Result<()> {
     reader.seek(SeekFrom::Start(offset))?;
     reader.read_exact(buf)?;
