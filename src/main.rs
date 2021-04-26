@@ -1,7 +1,7 @@
 extern crate clap;
+mod filesystem;
+mod utilities;
 use clap::{App, Arg};
-mod file;
-mod info;
 
 fn main() {
     let matches = App::new("AOS The Shooter")
@@ -18,22 +18,21 @@ fn main() {
         )
         .get_matches();
 
-    let myfile = matches.value_of("file").unwrap_or("input.txt");
-
-    //Check if file exists and throw an error if it doesn't
-    // Also don't continue the program
-
+    let myfile = matches.value_of("file").unwrap_or("");
     let operation = matches.value_of("operation");
+
+    let mut file = filesystem::check_file(myfile);
+    let file = file.as_mut().load_info(myfile);
+
     match operation {
         None => println!("No operation passed!"),
         Some(s) => match s {
             "/info" => {
                 //if selected option is info, run the function that gets
-                info::get_file_info(myfile);
+                file.print_info();
             }
             "/find" => {
                 //if selected option is info, run the function that gets
-                //find::find_file(myfile);
             }
             _ => println!("Invalid operation {}", s),
         },
