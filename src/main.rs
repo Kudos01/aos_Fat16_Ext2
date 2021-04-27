@@ -1,4 +1,7 @@
 extern crate clap;
+mod checker;
+mod ext2;
+mod fat16;
 mod filesystem;
 mod utilities;
 use clap::{App, Arg};
@@ -21,15 +24,15 @@ fn main() {
     let myfile = matches.value_of("file").unwrap_or("");
     let operation = matches.value_of("operation");
 
-    let mut file = filesystem::check_file(myfile);
-    let file = file.as_mut().load_info(myfile);
-
     match operation {
         None => println!("No operation passed!"),
         Some(s) => match s {
             "/info" => {
                 //if selected option is info, run the function that gets
-                file.print_info();
+                checker::check_file(myfile)
+                    .as_mut()
+                    .load_info(myfile)
+                    .print_info();
             }
             "/find" => {
                 //if selected option is info, run the function that gets
