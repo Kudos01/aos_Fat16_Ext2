@@ -6,12 +6,12 @@ use std::str;
 
 pub struct Fat16 {
     pub volume_name: [u8; 8],
-    pub sector_size: [u8; 2],
-    pub sectors_per_cluster: [u8; 1],
-    pub num_fats: [u8; 1],
-    pub root_entries: [u8; 2],
-    pub sectors_per_fat: [u8; 2],
-    pub reserved_sectors: [u8; 2],
+    pub sector_size: u16,
+    pub sectors_per_cluster: u8,
+    pub num_fats: u8,
+    pub root_entries: u16,
+    pub sectors_per_fat: u16,
+    pub reserved_sectors: u16,
     pub volume_label: [u8; 11],
 }
 
@@ -19,12 +19,12 @@ impl Default for Fat16 {
     fn default() -> Fat16 {
         Fat16 {
             volume_name: [0; 8],
-            sector_size: [0; 2],
-            sectors_per_cluster: [0; 1],
-            num_fats: [0; 1],
-            root_entries: [0; 2],
-            sectors_per_fat: [0; 2],
-            reserved_sectors: [0; 2],
+            sector_size: 0,
+            sectors_per_cluster: 0,
+            num_fats: 0,
+            root_entries: 0,
+            sectors_per_fat: 0,
+            reserved_sectors: 0,
             volume_label: [0; 11],
         }
     }
@@ -44,15 +44,21 @@ impl Filesystem for Fat16 {
 
         // ------------------------ SIZE ------------------------
         // Volume name starts at 11
-        utilities::seek_read(&mut opened_file, 11, &mut self.sector_size).unwrap();
+        let sector_size_temp: &mut [u8] = &mut [0; 2];
+        utilities::seek_read(&mut opened_file, 11, sector_size_temp).unwrap();
+        self.sector_size = LittleEndian::read_u16(sector_size_temp);
 
         // ------------------------ SECTORS PER CLUSTER ------------------------
         // starts at 13
-        utilities::seek_read(&mut opened_file, 13, &mut self.sectors_per_cluster).unwrap();
+        let sectors_per_cluster_temp: &mut [u8] = &mut [0; 1];
+        utilities::seek_read(&mut opened_file, 13, sectors_per_cluster_temp).unwrap();
+        self.sectors_per_cluster = sectors_per_cluster_temp[0];
 
         // ------------------------ RESERVED SECTORS ------------------------
         // starts at 14
-        utilities::seek_read(&mut opened_file, 14, &mut self.reserved_sectors).unwrap();
+        let reserved_sectors_temp: &mut [u8] = &mut [0; 2];
+        utilities::seek_read(&mut opened_file, 14, reserved_sectors_temp).unwrap();
+        self.reserved_sectors = LittleEndian::read_u16(reserved_sectors_temp);
 
         // ------------------------ VOLUME LABEL ------------------------
         // Volume Label starts at 43
@@ -60,15 +66,21 @@ impl Filesystem for Fat16 {
 
         // ------------------------ NUM FATS ------------------------
         // starts at 16
-        utilities::seek_read(&mut opened_file, 16, &mut self.num_fats).unwrap();
+        let num_fats_temp: &mut [u8] = &mut [0; 1];
+        utilities::seek_read(&mut opened_file, 16, num_fats_temp).unwrap();
+        self.num_fats = num_fats_temp[0];
 
         // ------------------------ ROOT ENTRIES ------------------------
         // starts at 17
-        utilities::seek_read(&mut opened_file, 17, &mut self.root_entries).unwrap();
+        let root_entries_temp: &mut [u8] = &mut [0; 2];
+        utilities::seek_read(&mut opened_file, 17, root_entries_temp).unwrap();
+        self.root_entries = LittleEndian::read_u16(root_entries_temp);
 
         // ------------------------ SECOTRS PER FAT ------------------------
         // starts at 22
-        utilities::seek_read(&mut opened_file, 22, &mut self.sectors_per_fat).unwrap();
+        let sectors_per_fat_temp: &mut [u8] = &mut [0; 2];
+        utilities::seek_read(&mut opened_file, 22, sectors_per_fat_temp).unwrap();
+        self.sectors_per_fat = LittleEndian::read_u16(sectors_per_fat_temp);
 
         return self;
     }
@@ -80,25 +92,16 @@ impl Filesystem for Fat16 {
             Ok(v) => println!("Volume Name: {}", v),
             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
         };
-        println!("Size: {}", LittleEndian::read_u16(&self.sector_size));
+        println!("Size: {}", self.sector_size);
 
-        println!("Sectors per cluster: {}", self.sectors_per_cluster[0]);
+        println!("Sectors per cluster: {}", self.sectors_per_cluster);
 
-        println!(
-            "Reserved sectors: {}",
-            LittleEndian::read_u16(&self.reserved_sectors)
-        );
+        println!("Reserved sectors: {}", self.reserved_sectors);
 
-        println!("Number of FATs: {}", self.num_fats[0]);
-        println!(
-            "Root entries: {}",
-            LittleEndian::read_u16(&self.root_entries)
-        );
+        println!("Number of FATs: {}", self.num_fats);
+        println!("Root entries: {}", self.root_entries);
 
-        println!(
-            "Sectors per FAT: {}",
-            LittleEndian::read_u16(&self.sectors_per_fat)
-        );
+        println!("Sectors per FAT: {}", self.sectors_per_fat);
 
         match str::from_utf8(&self.volume_label) {
             Ok(v) => println!("Volume Label: {}", v),
