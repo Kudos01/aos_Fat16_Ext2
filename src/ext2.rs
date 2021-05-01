@@ -234,6 +234,9 @@ impl Filesystem for Ext2 {
 
         let first_data_block_temp: &mut [u8] = &mut [0; 4];
         utilities::seek_read(&mut opened_file, offset_dir, first_data_block_temp).unwrap();
+
+        // TODO: WHY DO I NEED A -1 HERE?
+
         let first_data_block = LittleEndian::read_u32(&first_data_block_temp) - 1;
 
         //Sixth, go to offset i_block to get the @ of the file fragment
@@ -248,7 +251,18 @@ impl Filesystem for Ext2 {
 
         let mut cummulative_rec_len: u64 = 0;
 
+        let mut found = 0;
+
+        // TODO: THIS LOOP ITERATES ONE MORE THAN IT SHOULD, IDK WHY
+
         loop {
+            utilities::seek_read(
+                &mut opened_file,
+                working_offset + 7 + (file_num_offset),
+                &mut dir_entry.file_type,
+            )
+            .unwrap();
+
             utilities::seek_read(
                 &mut opened_file,
                 working_offset + (file_num_offset),
@@ -268,12 +282,6 @@ impl Filesystem for Ext2 {
                 &mut dir_entry.name_len,
             )
             .unwrap();
-            utilities::seek_read(
-                &mut opened_file,
-                working_offset + 7 + (file_num_offset),
-                &mut dir_entry.file_type,
-            )
-            .unwrap();
 
             //make a buffer of size of the name length
             let mut name = vec![0; dir_entry.name_len[0].into()];
@@ -285,6 +293,7 @@ impl Filesystem for Ext2 {
             )
             .unwrap();
 
+            /*
             println!(
                 "inode: {:?} rec len: {} name_len: {:?} file_type: {:?} NAME: {:?}\n",
                 dir_entry.inode,
@@ -293,10 +302,39 @@ impl Filesystem for Ext2 {
                 dir_entry.file_type,
                 str::from_utf8(&name)
             );
+            */
 
             if LittleEndian::read_u16(&dir_entry.rec_len) == 0
                 || cummulative_rec_len >= self.block_size.into()
             {
+                break;
+            } else if file_to_find.eq_ignore_ascii_case(str::from_utf8(&name).unwrap())
+                && dir_entry.file_type[0] != 2
+            {
+                found = 1;
+
+                //get the size from the inode
+                let offset_inode_file: u64 = ((inode_table_block * self.block_size)
+                    + (128 * (LittleEndian::read_u32(&dir_entry.inode) - 1)))
+                    .into();
+
+                /*
+                println!(
+                    "offset: {} inode table block: {} inode: {}",
+                    offset_inode_file,
+                    inode_table_block,
+                    LittleEndian::read_u32(&dir_entry.inode)
+                );
+                */
+
+                let size_file: &mut [u8] = &mut [0; 4];
+                utilities::seek_read(&mut opened_file, offset_inode_file + 4, size_file).unwrap();
+
+                println!(
+                    "Found the file! File size: {}",
+                    LittleEndian::read_u32(size_file)
+                );
+
                 break;
             } else {
                 file_num_offset =
@@ -305,7 +343,9 @@ impl Filesystem for Ext2 {
                 cummulative_rec_len += file_num_offset;
             }
         }
-
+        if found == 0 {
+            println!("File not found");
+        }
         return self;
     }
 }
