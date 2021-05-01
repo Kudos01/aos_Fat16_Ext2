@@ -23,6 +23,24 @@ pub struct Ext2 {
     pub frags_per_group: u32,
 }
 
+struct DirEntry {
+    pub inode: [u8; 4],
+    pub rec_len: [u8; 2],
+    pub name_len: [u8; 1],
+    pub file_type: [u8; 1],
+}
+
+impl Default for DirEntry {
+    fn default() -> DirEntry {
+        DirEntry {
+            inode: [0; 4],
+            rec_len: [0; 2],
+            name_len: [0; 1],
+            file_type: [0; 1],
+        }
+    }
+}
+
 impl Default for Ext2 {
     fn default() -> Ext2 {
         Ext2 {
@@ -191,24 +209,103 @@ impl Filesystem for Ext2 {
 
         //First, use the root inode (first inode) and convert it to inode index
         let local_inode_index = (self.first_inode - 1) % self.inodes_per_group;
-
+        //println!("local inode index: {}\n", local_inode_index);
         //Second, get what block group it is in (will always be 0 for the root inode)
         let block_group = (self.first_inode - 1) / self.inodes_per_group;
+        //println!("BG: {}\n", block_group);
 
         //Third, get offset of the inode table this inode is in
         let offset_bg: u64 = ((block_group + 1) * (2048 + 8)).into();
-        println!("offset_bg: {}\n", offset_bg);
+        //println!("offset_bg: {}\n", offset_bg);
+
         //Fourth, go to this @ and read 4 bytes to get the @ of the inode table for this BG
         let inode_table_temp: &mut [u8] = &mut [0; 4];
         utilities::seek_read(&mut opened_file, offset_bg, inode_table_temp).unwrap();
         let inode_table_block = LittleEndian::read_u32(&inode_table_temp);
-        println!("inode table block: {}\n", inode_table_block);
-        //Fifth, jump to the inode table and inode we were looking for and get the f_iaddr offset
-        let offset_i_faddr: u64 =
-            ((inode_table_block * self.block_size * local_inode_index) + 112).into();
+        //println!("inode table block: {}\n", inode_table_block);
 
-        //Sixth, go to offset i_faddr to get the @ of the file fragment
-        println!("i_faddr: {}\n", offset_i_faddr);
+        //Fifth, jump to the inode table and inode we were looking for and get the first i_block offset
+        let offset_inode: u64 =
+            ((inode_table_block * self.block_size) + (128 * local_inode_index)).into();
+
+        //println!("offset inode: {}, offset i_faddr: {}\n", offset_inode, offset_inode + 40);
+
+        let offset_dir = offset_inode + 40;
+
+        let first_data_block_temp: &mut [u8] = &mut [0; 4];
+        utilities::seek_read(&mut opened_file, offset_dir, first_data_block_temp).unwrap();
+        let first_data_block = LittleEndian::read_u32(&first_data_block_temp) - 1;
+
+        //Sixth, go to offset i_block to get the @ of the file fragment
+        //println!("offset final: {}\n", first_data_block * 1024);
+
+        //Lastly, Read the data at the start of the block until we find 0's for the rec len
+        let mut dir_entry: DirEntry = DirEntry::default();
+
+        let working_offset: u64 = (first_data_block * 1024).into();
+
+        let mut file_num_offset: u64 = 0;
+
+        let mut cummulative_rec_len: u64 = 0;
+
+        loop {
+            utilities::seek_read(
+                &mut opened_file,
+                working_offset + (file_num_offset),
+                &mut dir_entry.inode,
+            )
+            .unwrap();
+
+            utilities::seek_read(
+                &mut opened_file,
+                working_offset + 4 + (file_num_offset),
+                &mut dir_entry.rec_len,
+            )
+            .unwrap();
+            utilities::seek_read(
+                &mut opened_file,
+                working_offset + 6 + (file_num_offset),
+                &mut dir_entry.name_len,
+            )
+            .unwrap();
+            utilities::seek_read(
+                &mut opened_file,
+                working_offset + 7 + (file_num_offset),
+                &mut dir_entry.file_type,
+            )
+            .unwrap();
+
+            //make a buffer of size of the name length
+            let mut name = vec![0; dir_entry.name_len[0].into()];
+
+            utilities::seek_read(
+                &mut opened_file,
+                working_offset + 8 + (file_num_offset),
+                &mut name,
+            )
+            .unwrap();
+
+            println!(
+                "inode: {:?} rec len: {} name_len: {:?} file_type: {:?} NAME: {:?}\n",
+                dir_entry.inode,
+                LittleEndian::read_u16(&dir_entry.rec_len),
+                dir_entry.name_len,
+                dir_entry.file_type,
+                str::from_utf8(&name)
+            );
+
+            if LittleEndian::read_u16(&dir_entry.rec_len) == 0
+                || cummulative_rec_len >= self.block_size.into()
+            {
+                break;
+            } else {
+                file_num_offset =
+                    file_num_offset + (LittleEndian::read_u16(&dir_entry.rec_len) as u64);
+
+                cummulative_rec_len += file_num_offset;
+            }
+        }
+
         return self;
     }
 }
