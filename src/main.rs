@@ -19,9 +19,15 @@ fn main() {
                 .takes_value(true)
                 .help("The volume to be scanned"),
         )
+        .arg(
+            Arg::with_name("file_to_find")
+                .takes_value(true)
+                .help("The file to find (for option /find)"),
+        )
         .get_matches();
 
     let myfile = matches.value_of("file").unwrap_or("");
+    let file_to_find = matches.value_of("file_to_find").unwrap_or("");
     let operation = matches.value_of("operation");
 
     match operation {
@@ -36,6 +42,10 @@ fn main() {
             }
             "/find" => {
                 //if selected option is info, run the function that gets
+                checker::check_file(myfile)
+                    .as_mut()
+                    .load_info(myfile)
+                    .find(file_to_find, myfile);
             }
             _ => println!("Invalid operation {}", s),
         },

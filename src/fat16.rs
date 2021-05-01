@@ -110,4 +110,8 @@ impl Filesystem for Fat16 {
 
         return self;
     }
+
+    fn find(self: &mut Self, file_to_find: &str, name_of_file: &str) -> &mut dyn Filesystem {
+        return self;
+    }
 }

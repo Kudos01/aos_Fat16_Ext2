@@ -182,4 +182,33 @@ impl Filesystem for Ext2 {
         );
         return self;
     }
+
+    fn find(self: &mut Self, file_to_find: &str, name_of_file: &str) -> &mut dyn Filesystem {
+        let mut opened_file = match File::open(&name_of_file) {
+            Err(why) => panic!("couldn't open {}: {}", name_of_file, why),
+            Ok(opened_file) => opened_file,
+        };
+
+        //First, use the root inode (first inode) and convert it to inode index
+        let local_inode_index = (self.first_inode - 1) % self.inodes_per_group;
+
+        //Second, get what block group it is in (will always be 0 for the root inode)
+        let block_group = (self.first_inode - 1) / self.inodes_per_group;
+
+        //Third, get offset of the inode table this inode is in
+        let offset_bg: u64 = ((block_group + 1) * (2048 + 8)).into();
+        println!("offset_bg: {}\n", offset_bg);
+        //Fourth, go to this @ and read 4 bytes to get the @ of the inode table for this BG
+        let inode_table_temp: &mut [u8] = &mut [0; 4];
+        utilities::seek_read(&mut opened_file, offset_bg, inode_table_temp).unwrap();
+        let inode_table_block = LittleEndian::read_u32(&inode_table_temp);
+        println!("inode table block: {}\n", inode_table_block);
+        //Fifth, jump to the inode table and inode we were looking for and get the f_iaddr offset
+        let offset_i_faddr: u64 =
+            ((inode_table_block * self.block_size * local_inode_index) + 112).into();
+
+        //Sixth, go to offset i_faddr to get the @ of the file fragment
+        println!("i_faddr: {}\n", offset_i_faddr);
+        return self;
+    }
 }
