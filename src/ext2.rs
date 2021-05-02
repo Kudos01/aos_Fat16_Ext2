@@ -249,7 +249,7 @@ impl Filesystem for Ext2 {
 
         let mut file_num_offset: u64 = 0;
 
-        let mut cummulative_rec_len: u64 = 0;
+        //let mut cummulative_rec_len: u64 = 0;
 
         let mut found = 0;
 
@@ -305,7 +305,7 @@ impl Filesystem for Ext2 {
             */
 
             if LittleEndian::read_u16(&dir_entry.rec_len) == 0
-                || cummulative_rec_len >= self.block_size.into()
+                || file_num_offset >= self.block_size.into()
             {
                 break;
             } else if file_to_find.eq_ignore_ascii_case(str::from_utf8(&name).unwrap())
@@ -339,8 +339,6 @@ impl Filesystem for Ext2 {
             } else {
                 file_num_offset =
                     file_num_offset + (LittleEndian::read_u16(&dir_entry.rec_len) as u64);
-
-                cummulative_rec_len += file_num_offset;
             }
         }
         if found == 0 {

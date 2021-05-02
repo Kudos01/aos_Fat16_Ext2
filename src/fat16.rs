@@ -15,6 +15,24 @@ pub struct Fat16 {
     pub volume_label: [u8; 11],
 }
 
+struct DirEntry {
+    pub name: [u8; 8],
+    pub extension: [u8; 3],
+    pub filesize: [u8; 4],
+    pub file_type: [u8; 1],
+}
+
+impl Default for DirEntry {
+    fn default() -> DirEntry {
+        DirEntry {
+            name: [0; 8],
+            extension: [0; 3],
+            filesize: [0; 4],
+            file_type: [0; 1],
+        }
+    }
+}
+
 impl Default for Fat16 {
     fn default() -> Fat16 {
         Fat16 {
@@ -112,6 +130,94 @@ impl Filesystem for Fat16 {
     }
 
     fn find(self: &mut Self, file_to_find: &str, name_of_file: &str) -> &mut dyn Filesystem {
+        let mut opened_file = match File::open(&name_of_file) {
+            Err(why) => panic!("couldn't open {}: {}", name_of_file, why),
+            Ok(opened_file) => opened_file,
+        };
+        let mut offset_root_dir = (self.reserved_sectors * self.sector_size)
+            + (self.num_fats as u16 * self.sectors_per_fat * self.sector_size);
+
+        //println!("offset root dir: {}", offset_root_dir);
+
+        let mut dir_entry: DirEntry = DirEntry::default();
+
+        // every dir entry is 64 bytes
+        // (actually its 32 bytes but idk why the next dir entry starts at 64), first one is poop, idk why
+
+        let mut found = 0;
+
+        loop {
+            offset_root_dir += 64;
+            //first 8 bytes is the name
+            utilities::seek_read(
+                &mut opened_file,
+                offset_root_dir as u64,
+                &mut dir_entry.name,
+            )
+            .unwrap();
+
+            if LittleEndian::read_u64(&dir_entry.name) == 0 {
+                break;
+            }
+
+            let mut name = utilities::remove_whitespace(str::from_utf8(&dir_entry.name).unwrap());
+
+            // next 3 bytes is the extension
+            utilities::seek_read(
+                &mut opened_file,
+                offset_root_dir as u64 + 8,
+                &mut dir_entry.extension,
+            )
+            .unwrap();
+
+            let extension =
+                utilities::remove_whitespace(str::from_utf8(&dir_entry.extension).unwrap());
+
+            if extension.capacity() > 0 {
+                name.push_str(".");
+                name.push_str(&extension);
+            }
+
+            utilities::seek_read(
+                &mut opened_file,
+                offset_root_dir as u64 + 11,
+                &mut dir_entry.file_type,
+            )
+            .unwrap();
+
+            dir_entry.file_type[0] &= 16;
+
+            if name.eq_ignore_ascii_case(file_to_find) && dir_entry.file_type[0] != 16 {
+                println!("File Found!");
+                found = 1;
+                // last 4 bytes is size (32 -4 is starting offset)
+                utilities::seek_read(
+                    &mut opened_file,
+                    offset_root_dir as u64 + 28,
+                    &mut dir_entry.filesize,
+                )
+                .unwrap();
+
+                println!(
+                    "File size is: {} bytes",
+                    LittleEndian::read_u32(&dir_entry.filesize)
+                );
+                break;
+            }
+            /*
+            println!(
+                "Name: {} |{}| |{}|",
+                name,
+                extension,
+                LittleEndian::read_u32(&dir_entry.filesize)
+            );
+            */
+        }
+
+        if found == 0 {
+            println!("File not found");
+        }
+
         return self;
     }
 }

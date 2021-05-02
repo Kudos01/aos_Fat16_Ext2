@@ -20,4 +20,8 @@ pub mod utilities {
         reader.read_exact(buf)?;
         Ok(())
     }
+
+    pub fn remove_whitespace(s: &str) -> String {
+        s.chars().filter(|c| !c.is_whitespace()).collect()
+    }
 }
