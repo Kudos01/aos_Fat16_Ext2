@@ -12,7 +12,7 @@ pub struct Ext2 {
     pub num_inodes: u32,
     pub inodes_per_group: u32,
     pub first_inode: u32,
-    pub free_inodes: u16,
+    pub free_inodes: u32,
     pub inode_size: u16,
     pub free_blocks_count: u32,
     pub block_size: u32,
@@ -97,9 +97,9 @@ impl Filesystem for Ext2 {
 
         // ------------------------ FREE INODES ------------------------
         // starts at 16 + 1024
-        let free_inodes_temp: &mut [u8] = &mut [0; 2];
+        let free_inodes_temp: &mut [u8] = &mut [0; 4];
         utilities::seek_read(&mut opened_file, 16 + 1024, free_inodes_temp).unwrap();
-        self.free_inodes = LittleEndian::read_u16(&free_inodes_temp);
+        self.free_inodes = LittleEndian::read_u32(&free_inodes_temp);
 
         // ------------------------ BLOCK SIZE ------------------------
         // starts at 24 + 1024
