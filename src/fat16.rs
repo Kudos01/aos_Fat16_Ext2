@@ -185,6 +185,7 @@ impl Filesystem for Fat16 {
             )
             .unwrap();
 
+            //check if the directory flag is set
             dir_entry.file_type[0] &= 16;
 
             if name.eq_ignore_ascii_case(file_to_find) && dir_entry.file_type[0] != 16 {
