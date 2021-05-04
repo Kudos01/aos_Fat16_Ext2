@@ -16,6 +16,7 @@ pub struct Ext2 {
     pub inode_size: u16,
     pub free_blocks_count: u32,
     pub block_size: u32,
+    pub s_log_block_size: u32,
     pub reserved_blocks_count: u32,
     pub num_blocks: u32,
     pub first_data_block: u32,
@@ -55,6 +56,7 @@ impl Default for Ext2 {
             inode_size: 0,
             free_blocks_count: 0,
             block_size: 0,
+            s_log_block_size: 0,
             reserved_blocks_count: 0,
             num_blocks: 0,
             first_data_block: 0,
@@ -106,6 +108,7 @@ impl Filesystem for Ext2 {
         let block_size_tmp: &mut [u8] = &mut [0; 4];
         utilities::seek_read(&mut opened_file, 1024 + 24, block_size_tmp).unwrap();
         self.block_size = 1024 << LittleEndian::read_u32(&block_size_tmp);
+        self.s_log_block_size = LittleEndian::read_u32(&block_size_tmp);
 
         // ------------------------ RESERVED BLOCKS ------------------------
         // starts at 8 + 1024
@@ -207,49 +210,21 @@ impl Filesystem for Ext2 {
             Ok(opened_file) => opened_file,
         };
 
-        //First, use the root inode (first inode) and convert it to inode index
-        let local_inode_index = (2 - 1) % self.inodes_per_group;
-        //println!("local inode index: {}\n", local_inode_index);
-        //Second, get what block group it is in (will always be 0 for the root inode)
-        let block_group = (2 - 1) / self.inodes_per_group;
-        //println!("BG: {}\n", block_group);
+        let offset_inode = get_inode_offset(self, &mut opened_file, 2);
 
-        //Third, get offset of the inode table this inode is in
-        let offset_bg: u64 =
-            ((block_group * self.block_size * self.blocks_per_group) + (2048 + 8)).into();
-        //println!("offset_bg: {}\n", offset_bg);
+        let first_data_block = get_first_data_block(&mut opened_file, offset_inode);
 
-        //Fourth, go to this @ and read 4 bytes to get the @ of the inode table for this BG
-        let inode_table_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, offset_bg, inode_table_temp).unwrap();
-        let inode_table_block = LittleEndian::read_u32(&inode_table_temp);
-        //println!("inode table block: {}\n", inode_table_block);
-
-        //Fifth, jump to the inode table and inode we were looking for and get the first i_block offset
-        let offset_inode: u64 = ((inode_table_block * self.block_size)
-            + (self.inode_size as u32 * local_inode_index))
-            .into();
-
-        println!("offset inode: {}\n", offset_inode);
-
-        //let offset_inode = getInodeOffset(*self, opened_file);
-
-        let first_data_block_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, offset_inode + 40, first_data_block_temp).unwrap();
-
-        let first_data_block = LittleEndian::read_u32(&first_data_block_temp);
-
-        //Sixth, go to offset i_block to get the @ of the file fragment
         println!(
-            "offset final: {} FIRST: {}\n",
-            first_data_block * self.block_size,
-            first_data_block
+            "offset final: {}\n",
+            first_data_block * self.block_size as u64,
         );
 
         //Lastly, Read the data at the start of the block until we find 0's for the rec len
         let mut dir_entry: DirEntry = DirEntry::default();
 
-        let working_offset: u64 = (first_data_block * self.block_size).into();
+        let working_offset: u64 = (first_data_block * self.block_size as u64).into();
+
+        get_data_blocks(self, &mut opened_file, offset_inode);
 
         let mut file_num_offset: u64 = 0;
 
@@ -315,15 +290,15 @@ impl Filesystem for Ext2 {
             {
                 found = 1;
 
-                //get the size from the inode
-                let offset_inode_file: u64 = ((inode_table_block * self.block_size)
-                    + (self.inode_size as u32 * (LittleEndian::read_u32(&dir_entry.inode) - 1)))
-                    .into();
+                let offset_inode_file = get_inode_offset(
+                    self,
+                    &mut opened_file,
+                    LittleEndian::read_u32(&dir_entry.inode),
+                );
 
                 println!(
-                    "offset: {} inode table block: {} inode: {}",
+                    "offset: {}, inode: {}",
                     offset_inode_file,
-                    inode_table_block,
                     LittleEndian::read_u32(&dir_entry.inode)
                 );
 
@@ -357,12 +332,33 @@ impl Filesystem for Ext2 {
     }
 }
 
-fn getInodeOffset(ext2: Ext2, mut opened_file: File) -> u64 {
+fn get_first_data_block(opened_file: &mut File, inode_offset: u64) -> u64 {
+    let first_data_block_temp: &mut [u8] = &mut [0; 4];
+    utilities::seek_read(opened_file, inode_offset + 40, first_data_block_temp).unwrap();
+
+    return LittleEndian::read_u32(&first_data_block_temp).into();
+}
+
+fn get_size(opened_file: &mut File, inode_offset: u64) -> u64 {
+    let size_tmp: &mut [u8] = &mut [0; 4];
+    utilities::seek_read(opened_file, inode_offset + 4, size_tmp).unwrap();
+
+    return LittleEndian::read_u32(&size_tmp).into();
+}
+
+fn get_data_blocks(ext2: &Ext2, opened_file: &mut File, inode_offset: u64) -> u64 {
+    let size_tmp: &mut [u8] = &mut [0; 4];
+    utilities::seek_read(opened_file, inode_offset + 28, size_tmp).unwrap();
+
+    return LittleEndian::read_u32(&size_tmp) as u64 / (2 << ext2.s_log_block_size);
+}
+
+fn get_inode_offset(ext2: &Ext2, opened_file: &mut File, inode: u32) -> u64 {
     //First, use the root inode (first inode) and convert it to inode index
-    let local_inode_index = (2 - 1) % ext2.inodes_per_group;
+    let local_inode_index = (inode - 1) % ext2.inodes_per_group;
     //println!("local inode index: {}\n", local_inode_index);
     //Second, get what block group it is in (will always be 0 for the root inode)
-    let block_group = (2 - 1) / ext2.inodes_per_group;
+    let block_group = (inode - 1) / ext2.inodes_per_group;
     //println!("BG: {}\n", block_group);
 
     //Third, get offset of the inode table this inode is in
@@ -372,7 +368,7 @@ fn getInodeOffset(ext2: Ext2, mut opened_file: File) -> u64 {
 
     //Fourth, go to this @ and read 4 bytes to get the @ of the inode table for this BG
     let inode_table_temp: &mut [u8] = &mut [0; 4];
-    utilities::seek_read(&mut opened_file, offset_bg, inode_table_temp).unwrap();
+    utilities::seek_read(opened_file, offset_bg, inode_table_temp).unwrap();
     let inode_table_block = LittleEndian::read_u32(&inode_table_temp);
     //println!("inode table block: {}\n", inode_table_block);
 
