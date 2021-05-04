@@ -208,14 +208,15 @@ impl Filesystem for Ext2 {
         };
 
         //First, use the root inode (first inode) and convert it to inode index
-        let local_inode_index = (self.first_inode - 1) % self.inodes_per_group;
+        let local_inode_index = (2 - 1) % self.inodes_per_group;
         //println!("local inode index: {}\n", local_inode_index);
         //Second, get what block group it is in (will always be 0 for the root inode)
-        let block_group = (self.first_inode - 1) / self.inodes_per_group;
+        let block_group = (2 - 1) / self.inodes_per_group;
         //println!("BG: {}\n", block_group);
 
         //Third, get offset of the inode table this inode is in
-        let offset_bg: u64 = ((block_group + 1) * (2048 + 8)).into();
+        let offset_bg: u64 =
+            ((block_group * self.block_size * self.blocks_per_group) + (2048 + 8)).into();
         //println!("offset_bg: {}\n", offset_bg);
 
         //Fourth, go to this @ and read 4 bytes to get the @ of the inode table for this BG
@@ -225,27 +226,30 @@ impl Filesystem for Ext2 {
         //println!("inode table block: {}\n", inode_table_block);
 
         //Fifth, jump to the inode table and inode we were looking for and get the first i_block offset
-        let offset_inode: u64 =
-            ((inode_table_block * self.block_size) + (128 * local_inode_index)).into();
+        let offset_inode: u64 = ((inode_table_block * self.block_size)
+            + (self.inode_size as u32 * local_inode_index))
+            .into();
 
-        //println!("offset inode: {}, offset i_faddr: {}\n", offset_inode, offset_inode + 40);
+        println!("offset inode: {}\n", offset_inode);
 
-        let offset_dir = offset_inode + 40;
+        //let offset_inode = getInodeOffset(*self, opened_file);
 
         let first_data_block_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, offset_dir, first_data_block_temp).unwrap();
+        utilities::seek_read(&mut opened_file, offset_inode + 40, first_data_block_temp).unwrap();
 
-        // TODO: WHY DO I NEED A -1 HERE?
-
-        let first_data_block = LittleEndian::read_u32(&first_data_block_temp) - 1;
+        let first_data_block = LittleEndian::read_u32(&first_data_block_temp);
 
         //Sixth, go to offset i_block to get the @ of the file fragment
-        //println!("offset final: {}\n", first_data_block * 1024);
+        println!(
+            "offset final: {} FIRST: {}\n",
+            first_data_block * self.block_size,
+            first_data_block
+        );
 
         //Lastly, Read the data at the start of the block until we find 0's for the rec len
         let mut dir_entry: DirEntry = DirEntry::default();
 
-        let working_offset: u64 = (first_data_block * 1024).into();
+        let working_offset: u64 = (first_data_block * self.block_size).into();
 
         let mut file_num_offset: u64 = 0;
 
@@ -293,7 +297,6 @@ impl Filesystem for Ext2 {
             )
             .unwrap();
 
-            /*
             println!(
                 "inode: {:?} rec len: {} name_len: {:?} file_type: {:?} NAME: {:?}\n",
                 dir_entry.inode,
@@ -302,7 +305,6 @@ impl Filesystem for Ext2 {
                 dir_entry.file_type,
                 str::from_utf8(&name)
             );
-            */
 
             if LittleEndian::read_u16(&dir_entry.rec_len) == 0
                 || file_num_offset >= self.block_size.into()
@@ -315,20 +317,27 @@ impl Filesystem for Ext2 {
 
                 //get the size from the inode
                 let offset_inode_file: u64 = ((inode_table_block * self.block_size)
-                    + (128 * (LittleEndian::read_u32(&dir_entry.inode) - 1)))
+                    + (self.inode_size as u32 * (LittleEndian::read_u32(&dir_entry.inode) - 1)))
                     .into();
 
-                /*
                 println!(
                     "offset: {} inode table block: {} inode: {}",
                     offset_inode_file,
                     inode_table_block,
                     LittleEndian::read_u32(&dir_entry.inode)
                 );
-                */
 
                 let size_file: &mut [u8] = &mut [0; 4];
                 utilities::seek_read(&mut opened_file, offset_inode_file + 4, size_file).unwrap();
+
+                let blocks_data_file: &mut [u8] = &mut [0; 4];
+                utilities::seek_read(&mut opened_file, offset_inode_file + 40, blocks_data_file)
+                    .unwrap();
+
+                println!(
+                    "Blocks data of file: {}",
+                    LittleEndian::read_u32(blocks_data_file)
+                );
 
                 println!(
                     "Found the file! File size: {}",
@@ -346,4 +355,33 @@ impl Filesystem for Ext2 {
         }
         return self;
     }
+}
+
+fn getInodeOffset(ext2: Ext2, mut opened_file: File) -> u64 {
+    //First, use the root inode (first inode) and convert it to inode index
+    let local_inode_index = (2 - 1) % ext2.inodes_per_group;
+    //println!("local inode index: {}\n", local_inode_index);
+    //Second, get what block group it is in (will always be 0 for the root inode)
+    let block_group = (2 - 1) / ext2.inodes_per_group;
+    //println!("BG: {}\n", block_group);
+
+    //Third, get offset of the inode table this inode is in
+    let offset_bg: u64 =
+        ((block_group * ext2.block_size * ext2.blocks_per_group) + (2048 + 8)).into();
+    //println!("offset_bg: {}\n", offset_bg);
+
+    //Fourth, go to this @ and read 4 bytes to get the @ of the inode table for this BG
+    let inode_table_temp: &mut [u8] = &mut [0; 4];
+    utilities::seek_read(&mut opened_file, offset_bg, inode_table_temp).unwrap();
+    let inode_table_block = LittleEndian::read_u32(&inode_table_temp);
+    //println!("inode table block: {}\n", inode_table_block);
+
+    //Fifth, jump to the inode table and inode we were looking for and get the first i_block offset
+    let offset_inode: u64 = ((inode_table_block * ext2.block_size)
+        + (ext2.inode_size as u32 * local_inode_index))
+        .into();
+
+    println!("offset inode: {}\n", offset_inode);
+
+    return offset_inode;
 }
