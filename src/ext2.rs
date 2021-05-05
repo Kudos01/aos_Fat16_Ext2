@@ -244,10 +244,7 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) {
             dir_entry.file_type,
             str::from_utf8(&dir_entry.name)
         );
-
-        if LittleEndian::read_u16(&dir_entry.rec_len) == 0 || bytes_read >= ext2.block_size.into() {
-            break;
-        } else if file_to_find.eq_ignore_ascii_case(str::from_utf8(&dir_entry.name).unwrap())
+        if file_to_find.eq_ignore_ascii_case(str::from_utf8(&dir_entry.name).unwrap())
             && dir_entry.file_type[0] != 2
         {
             found = 1;
@@ -278,6 +275,25 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) {
             );
 
             break;
+        } else if dir_entry.file_type[0] == 2
+            && str::from_utf8(&dir_entry.name).unwrap().ne("lost+found")
+            && str::from_utf8(&dir_entry.name).unwrap().ne(".")
+            && str::from_utf8(&dir_entry.name).unwrap().ne("..")
+        {
+            //println!("NOT LOST+FOUND! OR . OR ..");
+
+            find_file(
+                ext2,
+                opened_file,
+                LittleEndian::read_u32(&dir_entry.inode),
+                file_to_find,
+            );
+
+            bytes_read = bytes_read + (LittleEndian::read_u16(&dir_entry.rec_len) as u64);
+
+            if bytes_read >= (ext2.block_size as u64 * num_data_blocks).into() {
+                break;
+            }
         } else {
             bytes_read = bytes_read + (LittleEndian::read_u16(&dir_entry.rec_len) as u64);
 
