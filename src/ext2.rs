@@ -233,7 +233,7 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) {
 
     loop {
         fill_dir_entry(&opened_file, data_offset, bytes_read, &mut dir_entry);
-
+        /*
         println!(
             "inode: {:?} rec len: {} name_len: {:?} file_type: {:?} NAME: {:?}\n",
             dir_entry.inode,
@@ -242,33 +242,28 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) {
             dir_entry.file_type,
             str::from_utf8(&dir_entry.name)
         );
+        */
         if file_to_find.eq_ignore_ascii_case(str::from_utf8(&dir_entry.name).unwrap())
             && dir_entry.file_type[0] != 2
         {
             let offset_inode_file =
                 get_inode_offset(ext2, opened_file, LittleEndian::read_u32(&dir_entry.inode));
 
+            /*
             println!(
                 "offset: {}, inode: {}",
                 offset_inode_file,
                 LittleEndian::read_u32(&dir_entry.inode)
             );
+            */
 
-            let size_file: &mut [u8] = &mut [0; 4];
-            utilities::seek_read(opened_file, offset_inode_file + 4, size_file).unwrap();
+            let size_file = get_size(opened_file, offset_inode_file);
 
-            let blocks_data_file: &mut [u8] = &mut [0; 4];
-            utilities::seek_read(opened_file, offset_inode_file + 40, blocks_data_file).unwrap();
+            let blocks_data_file = get_data_blocks(ext2, opened_file, offset_inode_file);
 
-            println!(
-                "Blocks data of file: {}",
-                LittleEndian::read_u32(blocks_data_file)
-            );
+            println!("Blocks data of file: {}", blocks_data_file);
 
-            println!(
-                "Found the file! File size: {}",
-                LittleEndian::read_u32(size_file)
-            );
+            println!("Found the file! File size: {}", size_file);
 
             break;
         } else if dir_entry.file_type[0] == 2
@@ -276,8 +271,6 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) {
             && str::from_utf8(&dir_entry.name).unwrap().ne(".")
             && str::from_utf8(&dir_entry.name).unwrap().ne("..")
         {
-            //println!("NOT LOST+FOUND! OR . OR ..");
-
             find_file(
                 ext2,
                 opened_file,
@@ -384,8 +377,6 @@ fn get_inode_offset(ext2: &Ext2, opened_file: &File, inode: u32) -> u64 {
     let offset_inode: u64 = ((inode_table_block * ext2.block_size)
         + (ext2.inode_size as u32 * local_inode_index))
         .into();
-
-    println!("offset inode: {}\n", offset_inode);
 
     return offset_inode;
 }
