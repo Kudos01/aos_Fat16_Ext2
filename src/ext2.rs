@@ -249,13 +249,11 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) {
             let offset_inode_file =
                 get_inode_offset(ext2, opened_file, LittleEndian::read_u32(&dir_entry.inode));
 
-            /*
             println!(
                 "offset: {}, inode: {}",
                 offset_inode_file,
                 LittleEndian::read_u32(&dir_entry.inode)
             );
-            */
 
             let size_file = get_size(opened_file, offset_inode_file);
 
