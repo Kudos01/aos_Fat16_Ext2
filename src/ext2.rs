@@ -231,8 +231,6 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) {
 
     let mut bytes_read: u64 = 0;
 
-    let mut found = 0;
-
     loop {
         fill_dir_entry(&opened_file, data_offset, bytes_read, &mut dir_entry);
 
@@ -247,8 +245,6 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) {
         if file_to_find.eq_ignore_ascii_case(str::from_utf8(&dir_entry.name).unwrap())
             && dir_entry.file_type[0] != 2
         {
-            found = 1;
-
             let offset_inode_file =
                 get_inode_offset(ext2, opened_file, LittleEndian::read_u32(&dir_entry.inode));
 
@@ -301,9 +297,6 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) {
                 break;
             }
         }
-    }
-    if found == 0 {
-        println!("File not found");
     }
 }
 
@@ -383,7 +376,8 @@ fn get_inode_offset(ext2: &Ext2, opened_file: &File, inode: u32) -> u64 {
     //Fourth, go to this @ and read 4 bytes to get the @ of the inode table for this BG
     let inode_table_temp: &mut [u8] = &mut [0; 4];
     utilities::seek_read(opened_file, offset_bg, inode_table_temp).unwrap();
-    let inode_table_block = LittleEndian::read_u32(&inode_table_temp);
+    let inode_table_block =
+        LittleEndian::read_u32(&inode_table_temp) + block_group * ext2.blocks_per_group;
     //println!("inode table block: {}\n", inode_table_block);
 
     //Fifth, jump to the inode table and inode we were looking for and get the first i_block offset
