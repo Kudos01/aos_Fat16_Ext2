@@ -212,9 +212,9 @@ impl Filesystem for Ext2 {
             Ok(opened_file) => opened_file,
         };
 
-        let done = find_file(self, &mut opened_file, 2, file_to_find);
+        let found = find_file(self, &mut opened_file, 2, file_to_find);
 
-        if !done {
+        if !found {
             println!("could not find the file :(");
         }
 
