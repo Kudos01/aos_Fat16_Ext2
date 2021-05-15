@@ -249,8 +249,6 @@ fn find_file(
                 * (LittleEndian::read_u16(&dir_entry.starting_cluster) - 2) as u128
                 + data_region_offset as u128;
 
-            println!("AAAAAA: {}", dir_offset);
-
             let found = find_file(
                 fat16,
                 &mut opened_file,
