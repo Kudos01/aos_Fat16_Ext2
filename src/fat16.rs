@@ -160,7 +160,7 @@ impl Filesystem for Fat16 {
             self,
             &mut opened_file,
             file_to_find,
-            offset_dir,
+            offset_dir as u128,
             data_region_offset,
             cluster_size,
         );
@@ -177,7 +177,7 @@ fn find_file(
     fat16: &Fat16,
     mut opened_file: &File,
     file_to_find: &str,
-    mut offset_dir: u16,
+    mut offset_dir: u128,
     data_region_offset: u16,
     cluster_size: u16,
 ) -> bool {
@@ -187,7 +187,6 @@ fn find_file(
     // (actually its 32 bytes but idk why the next dir entry starts at 64), first one is poop, idk why
 
     loop {
-        offset_dir += 64;
         //first 8 bytes is the name
         utilities::seek_read(opened_file, offset_dir as u64, &mut dir_entry.name).unwrap();
 
@@ -199,13 +198,21 @@ fn find_file(
         )
         .unwrap();
 
-        if LittleEndian::read_u64(&dir_entry.name) == 0 || dir_entry.file_type[0] == 15 {
+        if LittleEndian::read_u64(&dir_entry.name) == 0 {
             return false;
+        } else if dir_entry.file_type[0] == 15 || dir_entry.file_type[0] == 8 {
+            offset_dir += 32;
+            continue;
         }
 
         println!("Name: {}", str::from_utf8(&dir_entry.name).unwrap());
 
         let mut name = utilities::remove_whitespace(str::from_utf8(&dir_entry.name).unwrap());
+
+        if name.eq_ignore_ascii_case(".") || name.eq_ignore_ascii_case("..") {
+            offset_dir += 32;
+            continue;
+        }
 
         // next 3 bytes is the extension
         utilities::seek_read(opened_file, offset_dir as u64 + 8, &mut dir_entry.extension).unwrap();
@@ -250,7 +257,7 @@ fn find_file(
                 fat16,
                 &mut opened_file,
                 file_to_find,
-                offset_dir,
+                dir_offset,
                 data_region_offset,
                 cluster_size,
             );
@@ -258,6 +265,9 @@ fn find_file(
             if found == true {
                 return true;
             }
+            offset_dir += 32;
+        } else {
+            offset_dir += 32;
         }
     }
 }

@@ -1,4 +1,3 @@
-
 {
     "version": "0.2.0",
     "configurations": [
@@ -7,7 +6,11 @@
             "request": "launch",
             "name": "Debug",
             "program": "${workspaceFolder}/target/debug/aos_theshooter_2021",
-            "args": ["/find", "Ext2", "a"],
+            "args": [
+                "/find",
+                "Fat16.bin",
+                "aa"
+            ],
             "cwd": "${workspaceFolder}"
         }
     ]
