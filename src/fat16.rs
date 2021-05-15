@@ -13,6 +13,7 @@ pub struct Fat16 {
     pub sectors_per_fat: u16,
     pub reserved_sectors: u16,
     pub volume_label: [u8; 11],
+    pub total_sectors: u16,
 }
 
 struct DirEntry {
@@ -45,6 +46,7 @@ impl Default for Fat16 {
             root_entries: 0,
             sectors_per_fat: 0,
             reserved_sectors: 0,
+            total_sectors: 0,
             volume_label: [0; 11],
         }
     }
@@ -96,6 +98,12 @@ impl Filesystem for Fat16 {
         utilities::seek_read(&mut opened_file, 17, root_entries_temp).unwrap();
         self.root_entries = LittleEndian::read_u16(root_entries_temp);
 
+        // ------------------------ Total Sectors ------------------------
+        // starts at 19
+        let total_sectors_temp: &mut [u8] = &mut [0; 2];
+        utilities::seek_read(&mut opened_file, 19, total_sectors_temp).unwrap();
+        self.total_sectors = LittleEndian::read_u16(total_sectors_temp);
+
         // ------------------------ SECOTRS PER FAT ------------------------
         // starts at 22
         let sectors_per_fat_temp: &mut [u8] = &mut [0; 2];
@@ -123,6 +131,8 @@ impl Filesystem for Fat16 {
 
         println!("Sectors per FAT: {}", self.sectors_per_fat);
 
+        println!("Total Sectors: {}", self.total_sectors);
+
         match str::from_utf8(&self.volume_label) {
             Ok(v) => println!("Volume Label: {}", v),
             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
@@ -140,9 +150,20 @@ impl Filesystem for Fat16 {
         let offset_dir = (self.reserved_sectors * self.sector_size)
             + (self.num_fats as u16 * self.sectors_per_fat * self.sector_size);
 
-        println!("offset dir: {}", offset_dir);
+        let data_region_offset = (self.reserved_sectors * self.sector_size)
+            + (self.num_fats as u16 * self.sectors_per_fat * self.sector_size)
+            + (self.root_entries * 32);
 
-        let found = find_file(self, &mut opened_file, file_to_find, offset_dir);
+        let cluster_size = self.sectors_per_cluster as u16 * self.sector_size;
+
+        let found = find_file(
+            self,
+            &mut opened_file,
+            file_to_find,
+            offset_dir,
+            data_region_offset,
+            cluster_size,
+        );
 
         if !found {
             println!("could not find the file :(");
@@ -152,7 +173,14 @@ impl Filesystem for Fat16 {
     }
 }
 
-fn find_file(fat16: &Fat16, opened_file: &File, file_to_find: &str, mut offset_dir: u16) -> bool {
+fn find_file(
+    fat16: &Fat16,
+    mut opened_file: &File,
+    file_to_find: &str,
+    mut offset_dir: u16,
+    data_region_offset: u16,
+    cluster_size: u16,
+) -> bool {
     let mut dir_entry: DirEntry = DirEntry::default();
 
     // every dir entry is 64 bytes
@@ -163,7 +191,15 @@ fn find_file(fat16: &Fat16, opened_file: &File, file_to_find: &str, mut offset_d
         //first 8 bytes is the name
         utilities::seek_read(opened_file, offset_dir as u64, &mut dir_entry.name).unwrap();
 
-        if LittleEndian::read_u64(&dir_entry.name) == 0 {
+        //read the file type
+        utilities::seek_read(
+            opened_file,
+            offset_dir as u64 + 11,
+            &mut dir_entry.file_type,
+        )
+        .unwrap();
+
+        if LittleEndian::read_u64(&dir_entry.name) == 0 || dir_entry.file_type[0] == 15 {
             return false;
         }
 
@@ -180,13 +216,6 @@ fn find_file(fat16: &Fat16, opened_file: &File, file_to_find: &str, mut offset_d
             name.push_str(".");
             name.push_str(&extension);
         }
-
-        utilities::seek_read(
-            opened_file,
-            offset_dir as u64 + 11,
-            &mut dir_entry.file_type,
-        )
-        .unwrap();
 
         // Finally, read the starting cluster from dir entry
         utilities::seek_read(
@@ -209,13 +238,26 @@ fn find_file(fat16: &Fat16, opened_file: &File, file_to_find: &str, mut offset_d
                 LittleEndian::read_u32(&dir_entry.filesize)
             );
             return true;
-        } else {
+        } else if (dir_entry.file_type[0] & 16) == 16 {
             //TODO, recalculate offset
+            let dir_offset = cluster_size as u128
+                * (LittleEndian::read_u16(&dir_entry.starting_cluster) - 2) as u128
+                + data_region_offset as u128;
 
-            println!(
-                "Cluster: {}",
-                LittleEndian::read_u16(&dir_entry.starting_cluster)
+            println!("AAAAAA: {}", dir_offset);
+
+            let found = find_file(
+                fat16,
+                &mut opened_file,
+                file_to_find,
+                offset_dir,
+                data_region_offset,
+                cluster_size,
             );
+
+            if found == true {
+                return true;
+            }
         }
     }
 }
