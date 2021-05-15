@@ -1,8 +1,18 @@
+#![allow(non_upper_case_globals)]
 use crate::filesystem::*;
 use crate::utilities::*;
 use byteorder::{ByteOrder, LittleEndian};
 use std::fs::File;
 use std::str;
+
+const BPB_BytsPerSec: u64 = 11;
+const BPB_SecPerClus: u64 = 13;
+const BPB_RsvdSecCnt: u64 = 14;
+const BPB_NumFATs: u64 = 16;
+const BPB_RootEntCnt: u64 = 17;
+const BPB_TotSec16: u64 = 19;
+const BPB_FATSz16: u64 = 22;
+const BS_VolLab: u64 = 43;
 
 pub struct Fat16 {
     pub volume_name: [u8; 8],
@@ -61,53 +71,44 @@ impl Filesystem for Fat16 {
         };
 
         // ------------------------ VOLUME NAME ------------------------
-        // Volume name starts at 3
         utilities::seek_read(&mut opened_file, 3, &mut self.volume_name).unwrap();
 
         // ------------------------ SIZE ------------------------
-        // Volume name starts at 11
         let sector_size_temp: &mut [u8] = &mut [0; 2];
-        utilities::seek_read(&mut opened_file, 11, sector_size_temp).unwrap();
+        utilities::seek_read(&mut opened_file, BPB_BytsPerSec, sector_size_temp).unwrap();
         self.sector_size = LittleEndian::read_u16(sector_size_temp);
 
         // ------------------------ SECTORS PER CLUSTER ------------------------
-        // starts at 13
         let sectors_per_cluster_temp: &mut [u8] = &mut [0; 1];
-        utilities::seek_read(&mut opened_file, 13, sectors_per_cluster_temp).unwrap();
+        utilities::seek_read(&mut opened_file, BPB_SecPerClus, sectors_per_cluster_temp).unwrap();
         self.sectors_per_cluster = sectors_per_cluster_temp[0];
 
         // ------------------------ RESERVED SECTORS ------------------------
-        // starts at 14
         let reserved_sectors_temp: &mut [u8] = &mut [0; 2];
-        utilities::seek_read(&mut opened_file, 14, reserved_sectors_temp).unwrap();
+        utilities::seek_read(&mut opened_file, BPB_RsvdSecCnt, reserved_sectors_temp).unwrap();
         self.reserved_sectors = LittleEndian::read_u16(reserved_sectors_temp);
 
         // ------------------------ VOLUME LABEL ------------------------
-        // Volume Label starts at 43
-        utilities::seek_read(&mut opened_file, 43, &mut self.volume_label).unwrap();
+        utilities::seek_read(&mut opened_file, BS_VolLab, &mut self.volume_label).unwrap();
 
         // ------------------------ NUM FATS ------------------------
-        // starts at 16
         let num_fats_temp: &mut [u8] = &mut [0; 1];
-        utilities::seek_read(&mut opened_file, 16, num_fats_temp).unwrap();
+        utilities::seek_read(&mut opened_file, BPB_NumFATs, num_fats_temp).unwrap();
         self.num_fats = num_fats_temp[0];
 
         // ------------------------ ROOT ENTRIES ------------------------
-        // starts at 17
         let root_entries_temp: &mut [u8] = &mut [0; 2];
-        utilities::seek_read(&mut opened_file, 17, root_entries_temp).unwrap();
+        utilities::seek_read(&mut opened_file, BPB_RootEntCnt, root_entries_temp).unwrap();
         self.root_entries = LittleEndian::read_u16(root_entries_temp);
 
         // ------------------------ Total Sectors ------------------------
-        // starts at 19
         let total_sectors_temp: &mut [u8] = &mut [0; 2];
-        utilities::seek_read(&mut opened_file, 19, total_sectors_temp).unwrap();
+        utilities::seek_read(&mut opened_file, BPB_TotSec16, total_sectors_temp).unwrap();
         self.total_sectors = LittleEndian::read_u16(total_sectors_temp);
 
         // ------------------------ SECOTRS PER FAT ------------------------
-        // starts at 22
         let sectors_per_fat_temp: &mut [u8] = &mut [0; 2];
-        utilities::seek_read(&mut opened_file, 22, sectors_per_fat_temp).unwrap();
+        utilities::seek_read(&mut opened_file, BPB_FATSz16, sectors_per_fat_temp).unwrap();
         self.sectors_per_fat = LittleEndian::read_u16(sectors_per_fat_temp);
 
         return self;
@@ -182,9 +183,6 @@ fn find_file(
     cluster_size: u16,
 ) -> bool {
     let mut dir_entry: DirEntry = DirEntry::default();
-
-    // every dir entry is 64 bytes
-    // (actually its 32 bytes but idk why the next dir entry starts at 64), first one is poop, idk why
 
     loop {
         //first 8 bytes is the name

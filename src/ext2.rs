@@ -1,8 +1,26 @@
+#![allow(non_upper_case_globals)]
 use crate::filesystem::*;
 use crate::utilities::*;
 use byteorder::{ByteOrder, LittleEndian};
 use std::fs::File;
 use std::str;
+
+const s_wtime: u64 = 1024 + 48;
+const s_lastcheck: u64 = 1024 + 64;
+const s_mtime: u64 = 1024 + 44;
+const s_volume_name: u64 = 1024 + 120;
+const s_inodes_count: u64 = 1024 + 0;
+const s_inodes_per_group: u64 = 1024 + 40;
+const s_first_ino: u64 = 1024 + 84;
+const s_free_inodes_count: u64 = 1024 + 16;
+const s_inode_size: u64 = 1024 + 88;
+const s_free_blocks_count: u64 = 1024 + 12;
+const s_log_block_size: u64 = 1024 + 24;
+const s_r_blocks_count: u64 = 1024 + 8;
+const s_blocks_count: u64 = 1024 + 4;
+const s_first_data_block: u64 = 1024 + 20;
+const s_blocks_per_group: u64 = 1024 + 32;
+const s_frags_per_group: u64 = 1024 + 36;
 
 pub struct Ext2 {
     pub volume_name: [u8; 16],
@@ -76,93 +94,87 @@ impl Filesystem for Ext2 {
         };
 
         // ------------------------ INODE SIZE ------------------------
-        // starts at 88 + 1024
         let inode_size_temp: &mut [u8] = &mut [0; 2];
-        utilities::seek_read(&mut opened_file, 1024 + 88, inode_size_temp).unwrap();
+        utilities::seek_read(&mut opened_file, s_inode_size, inode_size_temp).unwrap();
         self.inode_size = LittleEndian::read_u16(&inode_size_temp);
 
         // ------------------------ NUM INODES ------------------------
-        // starts at 0 + 1024
         let num_inodes_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 1024, num_inodes_temp).unwrap();
+        utilities::seek_read(&mut opened_file, s_inodes_count, num_inodes_temp).unwrap();
         self.num_inodes = LittleEndian::read_u32(&num_inodes_temp);
 
         // ------------------------ FIRST INODE ------------------------
-        // starts at 84 + 1024
         let first_inode_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 84 + 1024, first_inode_temp).unwrap();
+        utilities::seek_read(&mut opened_file, s_first_ino, first_inode_temp).unwrap();
         self.first_inode = LittleEndian::read_u32(&first_inode_temp);
 
         // ------------------------ INODES PER GROUP ------------------------
-        // starts at 40 + 1024
         let inodes_per_group_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 40 + 1024, inodes_per_group_temp).unwrap();
+        utilities::seek_read(&mut opened_file, s_inodes_per_group, inodes_per_group_temp).unwrap();
         self.inodes_per_group = LittleEndian::read_u32(&inodes_per_group_temp);
 
         // ------------------------ FREE INODES ------------------------
-        // starts at 16 + 1024
         let free_inodes_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 16 + 1024, free_inodes_temp).unwrap();
+        utilities::seek_read(&mut opened_file, s_free_inodes_count, free_inodes_temp).unwrap();
         self.free_inodes = LittleEndian::read_u32(&free_inodes_temp);
 
         // ------------------------ BLOCK SIZE ------------------------
-        // starts at 24 + 1024
         let block_size_tmp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 1024 + 24, block_size_tmp).unwrap();
+        utilities::seek_read(&mut opened_file, s_log_block_size, block_size_tmp).unwrap();
         self.block_size = 1024 << LittleEndian::read_u32(&block_size_tmp);
         self.s_log_block_size = LittleEndian::read_u32(&block_size_tmp);
 
         // ------------------------ RESERVED BLOCKS ------------------------
-        // starts at 8 + 1024
         let reserved_blocks_count_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 8 + 1024, reserved_blocks_count_temp).unwrap();
+        utilities::seek_read(
+            &mut opened_file,
+            s_r_blocks_count,
+            reserved_blocks_count_temp,
+        )
+        .unwrap();
         self.reserved_blocks_count = LittleEndian::read_u32(&reserved_blocks_count_temp);
 
         // ------------------------ FREE BLOCKS ------------------------
-        // starts at 12 + 1024
         let free_blocks_count_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 12 + 1024, free_blocks_count_temp).unwrap();
+        utilities::seek_read(
+            &mut opened_file,
+            s_free_blocks_count,
+            free_blocks_count_temp,
+        )
+        .unwrap();
         self.free_blocks_count = LittleEndian::read_u32(&free_blocks_count_temp);
 
         // ------------------------ TOTAL BLOCKS ------------------------
-        // starts at 4 + 1024
         let num_blocks_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 4 + 1024, num_blocks_temp).unwrap();
+        utilities::seek_read(&mut opened_file, s_blocks_count, num_blocks_temp).unwrap();
         self.num_blocks = LittleEndian::read_u32(&num_blocks_temp);
 
         // ------------------------ FIRST DATA BLOCK ------------------------
-        // starts at 20 + 1024
         let first_data_block_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 20 + 1024, first_data_block_temp).unwrap();
+        utilities::seek_read(&mut opened_file, s_first_data_block, first_data_block_temp).unwrap();
         self.first_data_block = LittleEndian::read_u32(&first_data_block_temp);
 
         // ------------------------ GROUP BLOCKS ------------------------
-        // starts at 32 + 1024
         let blocks_per_group_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 32 + 1024, blocks_per_group_temp).unwrap();
+        utilities::seek_read(&mut opened_file, s_blocks_per_group, blocks_per_group_temp).unwrap();
         self.blocks_per_group = LittleEndian::read_u32(&blocks_per_group_temp);
 
         // ------------------------ FRAGS GROUP ------------------------
-        // starts at 36 + 1024
         let frags_per_group_temp: &mut [u8] = &mut [0; 4];
-        utilities::seek_read(&mut opened_file, 36 + 1024, frags_per_group_temp).unwrap();
+        utilities::seek_read(&mut opened_file, s_frags_per_group, frags_per_group_temp).unwrap();
         self.frags_per_group = LittleEndian::read_u32(&frags_per_group_temp);
 
         // ------------------------ VOLUME NAME ------------------------
-        // starts at 120 + 1024
-        utilities::seek_read(&mut opened_file, 1144, &mut self.volume_name).unwrap();
+        utilities::seek_read(&mut opened_file, s_volume_name, &mut self.volume_name).unwrap();
 
         // ------------------------ LAST CHECKED ------------------------
-        // starts at 64 + 1024
-        utilities::seek_read(&mut opened_file, 1024 + 64, &mut self.last_check).unwrap();
+        utilities::seek_read(&mut opened_file, s_lastcheck, &mut self.last_check).unwrap();
 
         // ------------------------ LAST MOUNTED ------------------------
-        // starts at 44+ 1024
-        utilities::seek_read(&mut opened_file, 1024 + 44, &mut self.last_mounted).unwrap();
+        utilities::seek_read(&mut opened_file, s_mtime, &mut self.last_mounted).unwrap();
 
         // ------------------------ LAST WRITE/EDIT ------------------------
-        // starts at 48+ 1024
-        utilities::seek_read(&mut opened_file, 1024 + 64, &mut self.last_write).unwrap();
+        utilities::seek_read(&mut opened_file, s_wtime, &mut self.last_write).unwrap();
 
         return self;
     }
