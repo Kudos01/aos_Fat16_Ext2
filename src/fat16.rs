@@ -203,8 +203,6 @@ fn find_file(
             continue;
         }
 
-        println!("Name: {}", str::from_utf8(&dir_entry.name).unwrap());
-
         let mut name = utilities::remove_whitespace(str::from_utf8(&dir_entry.name).unwrap());
 
         if name.eq_ignore_ascii_case(".") || name.eq_ignore_ascii_case("..") {
