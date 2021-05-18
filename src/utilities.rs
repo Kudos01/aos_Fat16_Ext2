@@ -21,6 +21,16 @@ pub mod utilities {
         Ok(())
     }
 
+    pub fn seek_write(
+        mut reader: impl Write + Seek,
+        offset: u128,
+        buf: &mut [u8],
+    ) -> io::Result<()> {
+        reader.seek(SeekFrom::Start(offset.try_into().unwrap()))?;
+        reader.write(buf)?;
+        Ok(())
+    }
+
     pub fn remove_whitespace(s: &str) -> String {
         s.chars().filter(|c| !c.is_whitespace()).collect()
     }

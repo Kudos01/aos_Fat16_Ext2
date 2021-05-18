@@ -218,13 +218,18 @@ impl Filesystem for Ext2 {
         return self;
     }
 
-    fn find(self: &mut Self, file_to_find: &str, name_of_file: &str) -> &mut dyn Filesystem {
+    fn find(
+        self: &mut Self,
+        file_to_find: &str,
+        name_of_file: &str,
+        delete_flag: bool,
+    ) -> &mut dyn Filesystem {
         let mut opened_file = match File::open(&name_of_file) {
             Err(why) => panic!("couldn't open {}: {}", name_of_file, why),
             Ok(opened_file) => opened_file,
         };
 
-        let found = find_file(self, &mut opened_file, 2, file_to_find);
+        let found = find_file(self, &mut opened_file, 2, file_to_find, delete_flag);
 
         if !found {
             println!("could not find the file :(");
@@ -234,7 +239,13 @@ impl Filesystem for Ext2 {
     }
 }
 
-fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) -> bool {
+fn find_file(
+    ext2: &Ext2,
+    opened_file: &File,
+    inode: u32,
+    file_to_find: &str,
+    delete_flag: bool,
+) -> bool {
     let offset_inode = get_inode_offset(ext2, opened_file, inode);
 
     let first_data_block = get_first_data_block(opened_file, offset_inode);
@@ -294,6 +305,7 @@ fn find_file(ext2: &Ext2, opened_file: &File, inode: u32, file_to_find: &str) ->
                 opened_file,
                 LittleEndian::read_u32(&dir_entry.inode),
                 file_to_find,
+                delete_flag,
             );
 
             bytes_read = bytes_read + (LittleEndian::read_u16(&dir_entry.rec_len) as u64);

@@ -42,10 +42,19 @@ fn main() {
             }
             "/find" => {
                 //if selected option is info, run the function that gets
-                checker::check_file(myfile)
-                    .as_mut()
-                    .load_info(myfile)
-                    .find(file_to_find, myfile);
+                checker::check_file(myfile).as_mut().load_info(myfile).find(
+                    file_to_find,
+                    myfile,
+                    false,
+                );
+            }
+            "/delete" => {
+                //if selected option is info, run the function that gets
+                checker::check_file(myfile).as_mut().load_info(myfile).find(
+                    file_to_find,
+                    myfile,
+                    true,
+                );
             }
             _ => println!("Invalid operation {}", s),
         },
