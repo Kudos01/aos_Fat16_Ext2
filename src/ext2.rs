@@ -229,7 +229,28 @@ impl Filesystem for Ext2 {
             Ok(opened_file) => opened_file,
         };
 
-        let found = find_file(self, &mut opened_file, 2, file_to_find, delete_flag);
+        let offset_inode = get_inode_offset(self, &opened_file, 2);
+
+        let num_data_blocks = get_data_blocks(self, &opened_file, offset_inode);
+
+        let mut block_counter = 0;
+
+        let mut found;
+        loop {
+            found = find_file(
+                self,
+                &mut opened_file,
+                offset_inode,
+                file_to_find,
+                delete_flag,
+                block_counter,
+            );
+
+            if num_data_blocks <= block_counter || found {
+                break;
+            }
+            block_counter += 1;
+        }
 
         if !found {
             println!("could not find the file :(");
@@ -242,20 +263,17 @@ impl Filesystem for Ext2 {
 fn find_file(
     ext2: &Ext2,
     opened_file: &File,
-    inode: u32,
+    offset_inode: u64,
     file_to_find: &str,
     delete_flag: bool,
+    block_counter: u64,
 ) -> bool {
-    let offset_inode = get_inode_offset(ext2, opened_file, inode);
-
-    let first_data_block = get_first_data_block(opened_file, offset_inode);
+    let data_block = get_data_block(opened_file, offset_inode, block_counter);
 
     //Lastly, Read the data at the start of the block until we find 0's for the rec len
     let mut dir_entry: DirEntry = DirEntry::default();
 
-    let data_offset: u64 = (first_data_block * ext2.block_size as u64).into();
-
-    let num_data_blocks = get_data_blocks(ext2, opened_file, offset_inode);
+    let data_offset: u64 = (data_block * ext2.block_size as u64).into();
 
     let mut bytes_read: u64 = 0;
 
@@ -288,8 +306,6 @@ fn find_file(
 
             let size_file = get_size(opened_file, offset_inode_file);
 
-            //let blocks_data_file = get_data_blocks(ext2, opened_file, offset_inode_file);
-
             //println!("Blocks data of file: {}", blocks_data_file);
 
             println!("Found the file! File size: {}", size_file);
@@ -300,34 +316,49 @@ fn find_file(
             && str::from_utf8(&dir_entry.name).unwrap().ne(".")
             && str::from_utf8(&dir_entry.name).unwrap().ne("..")
         {
-            let done = find_file(
-                ext2,
-                opened_file,
-                LittleEndian::read_u32(&dir_entry.inode),
-                file_to_find,
-                delete_flag,
-            );
+            let mut inner_block_counter = 0;
+            let mut found;
+            let blocks_data_file = get_data_blocks(ext2, opened_file, offset_inode);
+            loop {
+                found = find_file(
+                    ext2,
+                    opened_file,
+                    offset_inode,
+                    file_to_find,
+                    delete_flag,
+                    inner_block_counter,
+                );
+                if blocks_data_file <= inner_block_counter || found {
+                    break;
+                }
+                inner_block_counter += 1;
+            }
 
             bytes_read = bytes_read + (LittleEndian::read_u16(&dir_entry.rec_len) as u64);
 
-            if bytes_read >= (ext2.block_size as u64 * num_data_blocks).into() || done {
-                return done;
+            if bytes_read >= ext2.block_size as u64 || found {
+                return found;
             }
         } else {
             bytes_read = bytes_read + (LittleEndian::read_u16(&dir_entry.rec_len) as u64);
 
-            if bytes_read >= (ext2.block_size as u64 * num_data_blocks).into() {
+            if bytes_read >= ext2.block_size as u64 {
                 return false;
             }
         }
     }
 }
 
-fn get_first_data_block(opened_file: &File, inode_offset: u64) -> u64 {
-    let first_data_block_temp: &mut [u8] = &mut [0; 4];
-    utilities::seek_read(opened_file, inode_offset + 40, first_data_block_temp).unwrap();
+fn get_data_block(opened_file: &File, inode_offset: u64, block_counter: u64) -> u64 {
+    let data_block_temp: &mut [u8] = &mut [0; 4];
+    utilities::seek_read(
+        opened_file,
+        inode_offset + 40 * (block_counter + 1),
+        data_block_temp,
+    )
+    .unwrap();
 
-    return LittleEndian::read_u32(&first_data_block_temp).into();
+    return LittleEndian::read_u32(&data_block_temp).into();
 }
 
 fn get_size(opened_file: &File, inode_offset: u64) -> u64 {
