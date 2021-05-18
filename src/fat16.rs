@@ -3,6 +3,7 @@ use crate::filesystem::*;
 use crate::utilities::*;
 use byteorder::{ByteOrder, LittleEndian};
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::str;
 
 const BPB_BytsPerSec: u64 = 11;
@@ -142,8 +143,17 @@ impl Filesystem for Fat16 {
         return self;
     }
 
-    fn find(self: &mut Self, file_to_find: &str, name_of_file: &str) -> &mut dyn Filesystem {
-        let mut opened_file = match File::open(&name_of_file) {
+    fn find(
+        self: &mut Self,
+        file_to_find: &str,
+        name_of_file: &str,
+        delete_flag: bool,
+    ) -> &mut dyn Filesystem {
+        let mut opened_file = match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&name_of_file)
+        {
             Err(why) => panic!("couldn't open {}: {}", name_of_file, why),
             Ok(opened_file) => opened_file,
         };
@@ -164,6 +174,7 @@ impl Filesystem for Fat16 {
             offset_dir as u128,
             data_region_offset,
             cluster_size,
+            delete_flag,
         );
 
         if !found {
@@ -181,6 +192,7 @@ fn find_file(
     mut offset_dir: u128,
     data_region_offset: u16,
     cluster_size: u16,
+    delete_flag: bool,
 ) -> bool {
     let mut dir_entry: DirEntry = DirEntry::default();
 
@@ -198,12 +210,15 @@ fn find_file(
 
         if LittleEndian::read_u64(&dir_entry.name) == 0 {
             return false;
-        } else if dir_entry.file_type[0] == 15 || dir_entry.file_type[0] == 8 {
+        } else if dir_entry.file_type[0] == 15
+            || dir_entry.file_type[0] == 8
+            || dir_entry.name[0] == 0xE5
+        {
             offset_dir += 32;
             continue;
         }
 
-        println!("Name: {}", str::from_utf8(&dir_entry.name).unwrap());
+        //println!("Name: {}", str::from_utf8(&dir_entry.name).unwrap());
 
         let mut name = utilities::remove_whitespace(str::from_utf8(&dir_entry.name).unwrap());
 
@@ -234,22 +249,29 @@ fn find_file(
         if name.eq_ignore_ascii_case(file_to_find) && (dir_entry.file_type[0] & 16) != 16 {
             //NOT a directory
             println!("File Found!");
-            // last 4 bytes is size (32 -4 is starting offset)
-            utilities::seek_read(opened_file, offset_dir as u64 + 28, &mut dir_entry.filesize)
-                .unwrap();
 
-            println!(
-                "File size is: {} bytes",
-                LittleEndian::read_u32(&dir_entry.filesize)
-            );
+            if delete_flag == true {
+                // TODO write on pos offset_dir a 0xE5 since offset_dir is the position of the start of the name
+                let buf: &mut [u8] = &mut [0; 1];
+                buf[0] = 0xE5;
+                utilities::seek_write(opened_file, offset_dir, buf).unwrap();
+                println!("File Succesfully deleted.");
+            } else {
+                // last 4 bytes is size (32 -4 is starting offset)
+                utilities::seek_read(opened_file, offset_dir as u64 + 28, &mut dir_entry.filesize)
+                    .unwrap();
+
+                println!(
+                    "File size is: {} bytes",
+                    LittleEndian::read_u32(&dir_entry.filesize)
+                );
+            }
             return true;
         } else if (dir_entry.file_type[0] & 16) == 16 {
             //TODO, recalculate offset
             let dir_offset = cluster_size as u128
                 * (LittleEndian::read_u16(&dir_entry.starting_cluster) - 2) as u128
                 + data_region_offset as u128;
-
-            println!("AAAAAA: {}", dir_offset);
 
             let found = find_file(
                 fat16,
@@ -258,6 +280,7 @@ fn find_file(
                 dir_offset,
                 data_region_offset,
                 cluster_size,
+                delete_flag,
             );
 
             if found == true {
