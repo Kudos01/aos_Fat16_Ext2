@@ -325,10 +325,61 @@ fn find_file(
                         println!("File first in block");
 
                         //TODO Get the rec length of current file
-
+                        let new_offset_from_base =
+                            bytes_read + (LittleEndian::read_u16(&dir_entry.rec_len) as u64);
                         //TODO Go to next file and get its dir entry
+                        let mut dir_entry_next: DirEntry = DirEntry::default();
 
+                        fill_dir_entry(
+                            &opened_file,
+                            data_offset,
+                            new_offset_from_base,
+                            &mut dir_entry_next,
+                        );
+
+                        println!(
+                            "inode: {:?} rec len: {:?} name: {:?} name len: {:?} file type: {:?}",
+                            dir_entry.inode,
+                            dir_entry.rec_len,
+                            dir_entry.name,
+                            dir_entry.name_len,
+                            dir_entry.file_type
+                        );
                         //TODO write the whole dir entry into the start offset of the current file
+                        utilities::seek_write(
+                            opened_file,
+                            (data_offset + bytes_read).into(),
+                            &mut dir_entry.inode,
+                        )
+                        .unwrap();
+
+                        utilities::seek_write(
+                            opened_file,
+                            (data_offset + 4 + bytes_read).into(),
+                            &mut dir_entry.rec_len,
+                        )
+                        .unwrap();
+
+                        utilities::seek_write(
+                            opened_file,
+                            (data_offset + 6 + bytes_read).into(),
+                            &mut dir_entry.name_len,
+                        )
+                        .unwrap();
+
+                        utilities::seek_write(
+                            opened_file,
+                            (data_offset + 7 + bytes_read).into(),
+                            &mut dir_entry.file_type,
+                        )
+                        .unwrap();
+
+                        utilities::seek_write(
+                            opened_file,
+                            (data_offset + 8 + bytes_read).into(),
+                            &mut dir_entry.name,
+                        )
+                        .unwrap();
                     } else {
                         println!("File NOT first in block");
                         //get rec length of current file and save it
