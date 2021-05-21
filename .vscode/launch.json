@@ -7,9 +7,9 @@
             "name": "Debug",
             "program": "${workspaceFolder}/target/debug/aos_theshooter_2021",
             "args": [
-                "/find",
+                "/delete",
                 "Ext2",
-                "file1"
+                "com"
             ],
             "cwd": "${workspaceFolder}"
         }

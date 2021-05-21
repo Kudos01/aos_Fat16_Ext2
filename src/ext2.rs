@@ -3,6 +3,7 @@ use crate::filesystem::*;
 use crate::utilities::*;
 use byteorder::{ByteOrder, LittleEndian};
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::str;
 
 const s_wtime: u64 = 1024 + 48;
@@ -224,7 +225,11 @@ impl Filesystem for Ext2 {
         name_of_file: &str,
         delete_flag: bool,
     ) -> &mut dyn Filesystem {
-        let mut opened_file = match File::open(&name_of_file) {
+        let mut opened_file = match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&name_of_file)
+        {
             Err(why) => panic!("couldn't open {}: {}", name_of_file, why),
             Ok(opened_file) => opened_file,
         };
@@ -232,7 +237,6 @@ impl Filesystem for Ext2 {
         let offset_inode = get_inode_offset(self, &opened_file, 2);
 
         let num_data_blocks = get_data_blocks(self, &opened_file, offset_inode);
-        println!("Block outside of loop: {}", num_data_blocks);
 
         let mut block_counter = 0;
 
@@ -247,7 +251,6 @@ impl Filesystem for Ext2 {
                 block_counter,
             );
             block_counter += 1;
-            println!("Block INSIDE of loop: {}", num_data_blocks);
 
             if num_data_blocks <= block_counter || found {
                 break;
@@ -280,12 +283,12 @@ fn find_file(
     let mut bytes_read: u64 = 0;
 
     let mut index_offset = 0;
-    let mut array_offsets: [u64; 2] = [0; 2];
+    let mut array_rec_len: [u16; 2] = [0; 2];
 
     loop {
         fill_dir_entry(&opened_file, data_offset, bytes_read, &mut dir_entry);
 
-        array_offsets[index_offset % 2] = data_offset + bytes_read;
+        array_rec_len[index_offset % 2] = LittleEndian::read_u16(&dir_entry.rec_len);
         index_offset += 1;
 
         if file_to_find.eq_ignore_ascii_case(str::from_utf8(&dir_entry.name).unwrap())
@@ -303,12 +306,22 @@ fn find_file(
                 println!("We wanna delete");
                 if block_counter == 0 {
                     //TODO get rec length of current file and save it
-                    let rec_len = dir_entry.rec_len;
-                    println!("Rec length current: {:?}", rec_len);
+                    let current_rec_len = LittleEndian::read_u16(&dir_entry.rec_len);
+                    //TODO get rec length of the previous file
+                    let rec_len_prev = array_rec_len[index_offset % 2];
 
-                    //TODO modify the rec length of the previous file to have the rec length of the current file
-                    let offset_prev = array_offsets[(index_offset - 1) % 2];
-                    println!("Rec length previous: {:?}", offset_prev);
+                    let sum = current_rec_len + rec_len_prev;
+
+                    //let tmp = data_offset - rec_len_prev as u64 + 4;
+                    //println!("{}", tmp);
+                    //TODO modify the rec length of the previous file to have the rec lengths added up
+
+                    utilities::seek_write(
+                        opened_file,
+                        (data_offset + bytes_read - rec_len_prev as u64 + 4).into(),
+                        &mut sum.to_le_bytes(),
+                    )
+                    .unwrap();
                 } else {
                     println!("else");
                 }
