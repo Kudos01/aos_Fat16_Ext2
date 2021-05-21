@@ -8,8 +8,8 @@
             "program": "${workspaceFolder}/target/debug/aos_theshooter_2021",
             "args": [
                 "/find",
-                "Fat16.bin",
-                "aa"
+                "Ext2",
+                "file1"
             ],
             "cwd": "${workspaceFolder}"
         }
