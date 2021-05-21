@@ -8,8 +8,8 @@
             "program": "${workspaceFolder}/target/debug/aos_theshooter_2021",
             "args": [
                 "/delete",
-                "Ext2",
-                "com"
+                "Ext2_felipe",
+                "filewithareallylongnameonpurposebecauseIwanttotestthefunctionalityofthecode8"
             ],
             "cwd": "${workspaceFolder}"
         }
