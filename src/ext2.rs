@@ -354,13 +354,6 @@ fn find_file(
 
                         utilities::seek_write(
                             opened_file,
-                            (data_offset + 4).into(),
-                            &mut dir_entry_next.rec_len,
-                        )
-                        .unwrap();
-
-                        utilities::seek_write(
-                            opened_file,
                             (data_offset + 6).into(),
                             &mut dir_entry_next.name_len,
                         )
