@@ -344,7 +344,7 @@ fn find_file(
                             dir_entry_next.name_len,
                             dir_entry_next.file_type
                         );
-                        //TODO write the whole dir entry into the start offset of the current file
+                        //write the whole dir entry into the start offset of the current file
                         utilities::seek_write(
                             opened_file,
                             (data_offset).into(),
@@ -381,7 +381,6 @@ fn find_file(
                         .unwrap();
                     } else {
                         println!("File NOT first in block");
-                        /*
                         //get rec length of current file and save it
                         let current_rec_len = LittleEndian::read_u16(&dir_entry.rec_len);
                         //get rec length of the previous file
@@ -395,7 +394,6 @@ fn find_file(
                             &mut sum.to_le_bytes(),
                         )
                         .unwrap();
-                        */
                     }
                 }
             }
