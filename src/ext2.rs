@@ -283,7 +283,7 @@ fn find_file(
     let mut bytes_read: u64 = 0;
 
     let mut index_offset = 0;
-    let mut array_rec_len: [u16; 2] = [0; 2];
+    let mut array_rec_len: [u16; 2] = [0xFF; 2];
 
     loop {
         fill_dir_entry(&opened_file, data_offset, bytes_read, &mut dir_entry);
@@ -303,18 +303,15 @@ fn find_file(
                 //println!("Blocks data of file: {}", block_counter);
                 println!("Found the file! File size: {}", size_file);
             } else {
-                println!("We wanna delete");
                 if block_counter == 0 {
+                    println!("We wanna delete first block");
+
                     //TODO get rec length of current file and save it
                     let current_rec_len = LittleEndian::read_u16(&dir_entry.rec_len);
                     //TODO get rec length of the previous file
                     let rec_len_prev = array_rec_len[index_offset % 2];
 
                     let sum = current_rec_len + rec_len_prev;
-
-                    //let tmp = data_offset - rec_len_prev as u64 + 4;
-                    //println!("{}", tmp);
-                    //TODO modify the rec length of the previous file to have the rec lengths added up
 
                     utilities::seek_write(
                         opened_file,
@@ -323,7 +320,25 @@ fn find_file(
                     )
                     .unwrap();
                 } else {
-                    println!("else");
+                    if array_rec_len[1] == 0xFF {
+                        //The first file in the block
+                        println!("File first in block");
+                    } else {
+                        println!("File NOT first in block");
+                        //TODO get rec length of current file and save it
+                        let current_rec_len = LittleEndian::read_u16(&dir_entry.rec_len);
+                        //TODO get rec length of the previous file
+                        let rec_len_prev = array_rec_len[index_offset % 2];
+
+                        let sum = current_rec_len + rec_len_prev;
+
+                        utilities::seek_write(
+                            opened_file,
+                            (data_offset + bytes_read - rec_len_prev as u64 + 4).into(),
+                            &mut sum.to_le_bytes(),
+                        )
+                        .unwrap();
+                    }
                 }
             }
 
