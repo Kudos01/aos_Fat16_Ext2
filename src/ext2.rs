@@ -306,9 +306,9 @@ fn find_file(
                 if block_counter == 0 {
                     println!("We wanna delete first block");
 
-                    //TODO get rec length of current file and save it
+                    //get rec length of current file and save it
                     let current_rec_len = LittleEndian::read_u16(&dir_entry.rec_len);
-                    //TODO get rec length of the previous file
+                    //get rec length of the previous file
                     let rec_len_prev = array_rec_len[index_offset % 2];
 
                     let sum = current_rec_len + rec_len_prev;
@@ -323,11 +323,17 @@ fn find_file(
                     if array_rec_len[1] == 0xFF {
                         //The first file in the block
                         println!("File first in block");
+
+                        //TODO Get the rec length of current file
+
+                        //TODO Go to next file and get its dir entry
+
+                        //TODO write the whole dir entry into the start offset of the current file
                     } else {
                         println!("File NOT first in block");
-                        //TODO get rec length of current file and save it
+                        //get rec length of current file and save it
                         let current_rec_len = LittleEndian::read_u16(&dir_entry.rec_len);
-                        //TODO get rec length of the previous file
+                        //get rec length of the previous file
                         let rec_len_prev = array_rec_len[index_offset % 2];
 
                         let sum = current_rec_len + rec_len_prev;
