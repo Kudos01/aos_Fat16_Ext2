@@ -279,37 +279,40 @@ fn find_file(
 
     let mut bytes_read: u64 = 0;
 
+    let mut index_offset = 0;
+    let mut array_offsets: [u64; 2] = [0; 2];
+
     loop {
         fill_dir_entry(&opened_file, data_offset, bytes_read, &mut dir_entry);
-        /*
-        println!(
-            "inode: {:?} rec len: {} name_len: {:?} file_type: {:?} NAME: {:?}\n",
-            dir_entry.inode,
-            LittleEndian::read_u16(&dir_entry.rec_len),
-            dir_entry.name_len,
-            dir_entry.file_type,
-            str::from_utf8(&dir_entry.name)
-        );
-        */
+
+        array_offsets[index_offset % 2] = data_offset + bytes_read;
+        index_offset += 1;
 
         if file_to_find.eq_ignore_ascii_case(str::from_utf8(&dir_entry.name).unwrap())
             && dir_entry.file_type[0] != 2
         {
             let offset_inode_file =
                 get_inode_offset(ext2, opened_file, LittleEndian::read_u32(&dir_entry.inode));
-            /*
-            println!(
-                "offset: {}, inode: {}",
-                offset_inode_file,
-                LittleEndian::read_u32(&dir_entry.inode)
-            );
-            */
 
             let size_file = get_size(opened_file, offset_inode_file);
 
-            //println!("Blocks data of file: {}", block_counter);
+            if delete_flag == false {
+                //println!("Blocks data of file: {}", block_counter);
+                println!("Found the file! File size: {}", size_file);
+            } else {
+                println!("We wanna delete");
+                if block_counter == 0 {
+                    //TODO get rec length of current file and save it
+                    let rec_len = dir_entry.rec_len;
+                    println!("Rec length current: {:?}", rec_len);
 
-            println!("Found the file! File size: {}", size_file);
+                    //TODO modify the rec length of the previous file to have the rec length of the current file
+                    let offset_prev = array_offsets[(index_offset - 1) % 2];
+                    println!("Rec length previous: {:?}", offset_prev);
+                } else {
+                    println!("else");
+                }
+            }
 
             return true;
         } else if dir_entry.file_type[0] == 2
@@ -319,12 +322,14 @@ fn find_file(
         {
             let mut inner_block_counter = 0;
             let mut found;
+
             //recalculate offset inode
             let offset_inode =
                 get_inode_offset(ext2, &opened_file, LittleEndian::read_u32(&dir_entry.inode));
             let blocks_data_file = get_data_blocks(ext2, opened_file, offset_inode);
             println!("Blocks: {}", blocks_data_file);
             loop {
+                //println!("inner: {}", inner_block_counter);
                 found = find_file(
                     ext2,
                     opened_file,
