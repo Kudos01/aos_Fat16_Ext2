@@ -1,3 +1,4 @@
+Markup :  # Heading 1 #
 # AOS_TheShooter_2021
 By Felipe Perez Stoppa
 
@@ -10,3 +11,8 @@ https://doc.rust-lang.org/book/ch01-01-installation.html
 Once you have cloned the repository, you can run `cargo build` to build the project.
 
 Once built, you can find the executable under `/repo_dir/target/debug/executable`
+
+
+# FAT16
+
+For fat16 
