@@ -11,7 +11,6 @@ Once you have cloned the repository, you can run `cargo build` to build the proj
 
 Once built, you can find the executable under `/repo_dir/target/debug/executable`
 
-
 # FAT16 #
 
 ### General info ###
@@ -40,16 +39,26 @@ This is the region where the bulk of the space is taken up. It contains the file
 The directory entries in FAT have the following structure:
 ![fat16_dir](/images/fat16_dir.png)
 
-source: http://www.maverick-os.dk/FileSystemFormats/FAT16_FileSystem.html
-
 The important thing to highlight here is the attribute byte:
 ![fat16_attr](/images/attribute_fat16.png)
 
-source: http://www.maverick-os.dk/FileSystemFormats/FAT16_FileSystem.html
-
 This gives the type of file that this entry is describing.
 
+* Read Only: self explanatory
 
+* Hidden: This flag indicates to the system that the file should be hidden when doing normal directory listings.
+
+* System: This flag indicates that the file/directory is important for the system
+
+* Volume Name: When this flag is set, the directory entry is not pointing to a file, but to nothing. It is used for storing the volumme label
+
+* Directory: This flag is set, when an entry in the directory table is not pointing to the beginning of a file, but to another directory table.
+
+* Achieve Flag: This flag is used by backup utilities. The flag is set when ever a file is created, renamed or changed. Backup utilities can then use this flag to determine which files that has been modified since the last backup.
+
+sources: 
+* http://www.maverick-os.dk/FileSystemFormats/FAT16_FileSystem.html
+* https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#Directory_table
 
 # EXT2 #
 
@@ -71,10 +80,12 @@ These are logical aprtitions of the disk, and the filesystem is structured as su
 ### Directory entries ###
 The directory entries of ext2 have the following structure:
 ![ext2_dir](/images/ext2_dir.png)
-source: https://piazza.com/class_profile/get_resource/il71xfllx3l16f/inz4wsb2m0w2oz#:~:text=The%20Ext2%20file%20system%20divides,lower%20average%20disk%20seek%20time.
 
 * Inode number: The inode containing the information of this directory entry, which is 4 bytes long.
 * Record length: The length of this directory entry. This is also used as an offset to know where we can find the next directory entry relative to the start offset of the current file. This field is 2 bytes long.
 * Name length: 1 byte field indicaating the length of the name.
 * File type: 1 byte field indicaating the type of the file (directory, regular file, character device, block device, etc.).
 * Name: The name of this directory entry. It is a minimum of 4 bytes and a maximum of 256 bytes, as per the name length field.
+
+sources: 
+* https://piazza.com/class_profile/get_resource/il71xfllx3l16f/inz4wsb2m0w2oz#:~:text=The%20Ext2%20file%20system%20divides,lower%20average%20disk%20seek%20time.
