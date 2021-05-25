@@ -38,6 +38,7 @@ These are logical aprtitions of the disk, and the filesystem is structured as su
 ### Directory entries ###
 The directory entries of ext2 have the following structure:
 ![ext2_dir](/images/ext2_dir.png)
+
 source: https://piazza.com/class_profile/get_resource/il71xfllx3l16f/inz4wsb2m0w2oz#:~:text=The%20Ext2%20file%20system%20divides,lower%20average%20disk%20seek%20time.
 
 * Inode number: The inode containing the information of this directory entry, which is 4 bytes long.
