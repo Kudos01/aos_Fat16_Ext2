@@ -304,7 +304,7 @@ fn find_file(
                 println!("Found the file! File size: {}", size_file);
             } else {
                 if block_counter == 0 {
-                    println!("We wanna delete first block");
+                    //println!("We wanna delete first block");
 
                     //get rec length of current file and save it
                     let current_rec_len = LittleEndian::read_u16(&dir_entry.rec_len);
@@ -322,11 +322,10 @@ fn find_file(
                 } else {
                     if array_rec_len[1] == 0xFF {
                         //The first file in the block
-                        println!("File first in block");
-                        //TODO Get the rec length of current file
+                        //Get the rec length of current file
                         let new_offset_from_base =
                             bytes_read + (LittleEndian::read_u16(&dir_entry.rec_len) as u64);
-                        //TODO Go to next file and get its dir entry
+                        //Go to next file and get its dir entry
                         let mut dir_entry_next: DirEntry = DirEntry::default();
 
                         fill_dir_entry(
@@ -336,14 +335,6 @@ fn find_file(
                             &mut dir_entry_next,
                         );
 
-                        println!(
-                            "inode: {:?} rec len: {:?} name: {:?} name len: {:?} file type: {:?}",
-                            dir_entry_next.inode,
-                            dir_entry_next.rec_len,
-                            dir_entry_next.name,
-                            dir_entry_next.name_len,
-                            dir_entry_next.file_type
-                        );
                         //write the whole dir entry into the start offset of the current file
                         utilities::seek_write(
                             opened_file,
@@ -352,8 +343,8 @@ fn find_file(
                         )
                         .unwrap();
 
-                        let sum = LittleEndian::read_u32(&dir_entry_next.rec_len)
-                            + LittleEndian::read_u32(&dir_entry.rec_len);
+                        let sum = LittleEndian::read_u16(&dir_entry_next.rec_len)
+                            + LittleEndian::read_u16(&dir_entry.rec_len);
 
                         utilities::seek_write(
                             opened_file,
@@ -383,7 +374,7 @@ fn find_file(
                         )
                         .unwrap();
                     } else {
-                        println!("File NOT first in block");
+                        //println!("File NOT first in block");
                         //get rec length of current file and save it
                         let current_rec_len = LittleEndian::read_u16(&dir_entry.rec_len);
                         //get rec length of the previous file
@@ -399,6 +390,7 @@ fn find_file(
                         .unwrap();
                     }
                 }
+                println!("File succesfully deleted!");
             }
 
             return true;
@@ -414,9 +406,7 @@ fn find_file(
             let offset_inode =
                 get_inode_offset(ext2, &opened_file, LittleEndian::read_u32(&dir_entry.inode));
             let blocks_data_file = get_data_blocks(ext2, opened_file, offset_inode);
-            println!("Blocks: {}", blocks_data_file);
             loop {
-                //println!("inner: {}", inner_block_counter);
                 found = find_file(
                     ext2,
                     opened_file,
