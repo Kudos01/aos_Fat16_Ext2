@@ -352,6 +352,16 @@ fn find_file(
                         )
                         .unwrap();
 
+                        let sum = LittleEndian::read_u32(&dir_entry_next.rec_len)
+                            + LittleEndian::read_u32(&dir_entry.rec_len);
+
+                        utilities::seek_write(
+                            opened_file,
+                            (data_offset + 4).into(),
+                            &mut sum.to_le_bytes(),
+                        )
+                        .unwrap();
+
                         utilities::seek_write(
                             opened_file,
                             (data_offset + 6).into(),
