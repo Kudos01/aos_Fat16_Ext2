@@ -38,3 +38,10 @@ These are logical aprtitions of the disk, and the filesystem is structured as su
 ### Directory entries ###
 The directory entries of ext2 have the following structure:
 ![ext2_dir](/images/ext2_dir.png)
+source: https://piazza.com/class_profile/get_resource/il71xfllx3l16f/inz4wsb2m0w2oz#:~:text=The%20Ext2%20file%20system%20divides,lower%20average%20disk%20seek%20time.
+
+* Inode number: The inode containing the information of this directory entry, which is 4 bytes long.
+* Record length: The length of this directory entry. This is also used as an offset to know where we can find the next directory entry relative to the start offset of the current file. This field is 2 bytes long.
+* Name length: 1 byte field indicaating the length of the name.
+* File type: 1 byte field indicaating the type of the file (directory, regular file, character device, block device, etc.).
+* Name: The name of this directory entry. It is a minimum of 4 bytes and a maximum of 256 bytes, as per the name length field.
