@@ -16,7 +16,40 @@ Once built, you can find the executable under `/repo_dir/target/debug/executable
 
 ### General info ###
 
-FAT stands for file allocation table.
+FAT stands for file allocation table. It was originally develooped in 1977 for floppy disks. There exists several versions of the FAT file system, and the 32 bit versio, FAT32 is still currently used for most USB sticks and SD cards.
+
+FAT16 is the 16 bit implementation of FAT, introduced in 1984.
+
+### Boot sector ###
+This sector goes by many names (0th sector for example), but the important fact is that it is the first sector of the volume, in the reserved region.
+
+This sector contains information pertaining to the volume, like the bytes per sector, sectors per cluster, number of reserved sectors, number of FATs, etc.
+
+### Reserved sectors ###
+The first reserved sector is the boot sector, as mentioned before. However, there can be more than one reserved sector. For example, Microsoft uses sector 12 of the reserved sectors area for an extended boot loader.
+
+### FAT Region ###
+This region contains the mapping of which clusters are used by files and directories. 
+### Root directory region ###
+This region contains a Directory table, which is a special type of file that represents a directory, with the contents of the root directory. Every entry ender a directory table, is 32 bytes.
+
+### Data Region ###
+This is the region where the bulk of the space is taken up. It contains the file and directory data. 
+
+### Directory entries ###
+The directory entries in FAT have the following structure:
+![fat16_dir](/images/fat16_dir.png)
+
+source: http://www.maverick-os.dk/FileSystemFormats/FAT16_FileSystem.html
+
+The important thing to highlight here is the attribute byte:
+![fat16_attr](/images/attribute_fat16.png)
+
+source: http://www.maverick-os.dk/FileSystemFormats/FAT16_FileSystem.html
+
+This gives the type of file that this entry is describing.
+
+
 
 # EXT2 #
 
@@ -38,7 +71,6 @@ These are logical aprtitions of the disk, and the filesystem is structured as su
 ### Directory entries ###
 The directory entries of ext2 have the following structure:
 ![ext2_dir](/images/ext2_dir.png)
-
 source: https://piazza.com/class_profile/get_resource/il71xfllx3l16f/inz4wsb2m0w2oz#:~:text=The%20Ext2%20file%20system%20divides,lower%20average%20disk%20seek%20time.
 
 * Inode number: The inode containing the information of this directory entry, which is 4 bytes long.
