@@ -11,6 +11,35 @@ Once you have cloned the repository, you can run `cargo build` to build the proj
 
 Once built, you can find the executable under `/repo_dir/target/debug/executable`
 
+# Explanation of the practice #
+For this project we were required to develop a program that would show the information, find and delete files of a volume formatted in one of 2 filesystems, FAT16 or EXT2.
+
+### Design ###
+For the design of the project, I decide to modulate the project files such that I would have the specific implementation of how to find, delete and get the info from the volumes in one file for each filesystem. The files `fat16.rs` and `ext2.rs` are the implementations of the functionality that a "filesystem" needs to have. The definition of what functionality a filesystem must have are is located in the `filesystem.rs` file. The utilities file contains the necesary functions to read and write at specific offsets in a file, amongst others. The `checker.rs` file is where the implementation for knowing what type of filesystem we are dealing with is.
+
+### Data structures ###
+The main data structures used were structs where the code saved the information from the file necesary for printing to the user in case of the `/info` option, and subsequently the information neceary to perform seek and read operations at different offsets knowing the structure of the file. Structs were also used to replicate the form of the directory entries of both filesystems.
+
+### Tests performed ###
+The tests performed consisted of running a combination of the following commands, while, in the case of find and delete, checking manually if the file existed by mounting the volume and navigating through all the directories of the test volumes provided. In the case of delete, once we knew the file existed, deleting it and checking after the operation of it still existed, and trying again once it was deleted to check if it didnt find a file to delete.
+
+To see the info of a volume:
+* `/repo_dir/target/debug/aos_the_shooter /info <VOLUME>`
+
+To find a file in a volume:
+* `/repo_dir/target/debug/aos_the_shooter /find <VOLUME> <FILE>`
+
+To delete a file in a volume:
+* `/repo_dir/target/debug/aos_the_shooter /delete <VOLUME> <FILE>`
+
+### Temporal estimation ##
+![temporal_est](/images/chart.png)
+
+### Observed problems and conclusions ###
+Most of the problems for this practice came from my lack of familiarity with rust, especially with crates, modules, traits and implementations. I had to change the way I thought about how to structure the program. Since in the past any big project that I had coded had been using the object oriented paradigm using classes and objects, while rust did not offer such a way of coding. Instead rust uses traits and implementations. For example, we can have a `walk` trait, defined. This is a behaviour. Then we can make a `human` and a `dog` struct, and make them both implement the `walk` trait. We then code for each of them how we want the walk behaviour to behave. For the dog we might say it uses 4 legs and for the human 2. It is the same trait, just different implementations. I took advantage of this with function return types. For the file checker function, I wanted it to return a filesystem of the type that it found the input file to be, either fat16 or ext2. This can be done by specifying that the return type be something that implements the `filesystem` trait. Granted, in my case I had to return a `Box` of a variable that implemented `filesystem`. This was because depending on wether the filesystem is ext2 or fat16, the size of the struct is different, and we have to "ask" rust to dynamically allocate memory depending on which one it is.
+
+As for more technical problems with the project, the main thing was sitting down and understanding both filesystems to be able to perform the operations desired (finding files, deleting them, etc.).
+
 # FAT16 #
 
 ### General info ###
