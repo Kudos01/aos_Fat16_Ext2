@@ -33,7 +33,7 @@ To delete a file in a volume:
 * `/repo_dir/target/debug/aos_the_shooter /delete <VOLUME> <FILE>`
 
 ### Temporal estimation ##
-![temporal_est](/images/chart.png)
+![temporal_est](/images/Chart.png)
 
 ### Observed problems and conclusions ###
 Most of the problems for this practice came from my lack of familiarity with rust, especially with crates, modules, traits and implementations. I had to change the way I thought about how to structure the program. Since in the past any big project that I had coded had been using the object oriented paradigm using classes and objects, while rust did not offer such a way of coding. Instead rust uses traits and implementations. For example, we can have a `walk` trait, defined. This is a behaviour. Then we can make a `human` and a `dog` struct, and make them both implement the `walk` trait. We then code for each of them how we want the walk behaviour to behave. For the dog we might say it uses 4 legs and for the human 2. It is the same trait, just different implementations. I took advantage of this with function return types. For the file checker function, I wanted it to return a filesystem of the type that it found the input file to be, either fat16 or ext2. This can be done by specifying that the return type be something that implements the `filesystem` trait. Granted, in my case I had to return a `Box` of a variable that implemented `filesystem`. This was because depending on wether the filesystem is ext2 or fat16, the size of the struct is different, and we have to "ask" rust to dynamically allocate memory depending on which one it is.
