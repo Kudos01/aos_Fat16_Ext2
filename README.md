@@ -1,4 +1,4 @@
-# AOS_TheShooter_2021 #
+# AOS_Fat16_EXT2_2021 #
 By Felipe Perez Stoppa
 
 # Quick start #
